@@ -1,0 +1,1 @@
+entrypoint: node starters/nextjs/basic/.next/standalone/server.js

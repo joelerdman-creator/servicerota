@@ -1,4 +1,1 @@
-entrypoint: node starters/nextjs/basic/.next/standalone/server.js
-env:
-  - variable: MESSAGE
-    value: Hello!
+entrypoint: node starters/nextjs/firebase-ecommerce/.next/standalone/server.js

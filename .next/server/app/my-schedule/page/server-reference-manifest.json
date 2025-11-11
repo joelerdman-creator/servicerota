@@ -1,0 +1,27 @@
+{
+  "node": {
+    "4047551a43723883f9c1dfb425ad33d4084d56b2c6": {
+      "workers": {
+        "app/my-schedule/page": {
+          "moduleId": "[project]/.next-internal/server/app/my-schedule/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/ai/flows/generate-request-email-flow.ts [app-rsc] (ecmascript)\", ACTIONS_MODULE1 => \"[project]/src/lib/email.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        }
+      },
+      "layer": {
+        "app/my-schedule/page": "action-browser"
+      }
+    },
+    "40889719f6b7df30cc1d410bbdcd731878f58b6ed4": {
+      "workers": {
+        "app/my-schedule/page": {
+          "moduleId": "[project]/.next-internal/server/app/my-schedule/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/ai/flows/generate-request-email-flow.ts [app-rsc] (ecmascript)\", ACTIONS_MODULE1 => \"[project]/src/lib/email.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        }
+      },
+      "layer": {
+        "app/my-schedule/page": "action-browser"
+      }
+    }
+  },
+  "edge": {}
+}

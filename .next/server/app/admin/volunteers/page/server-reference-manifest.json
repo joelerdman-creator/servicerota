@@ -1,0 +1,16 @@
+{
+  "node": {
+    "40889719f6b7df30cc1d410bbdcd731878f58b6ed4": {
+      "workers": {
+        "app/admin/volunteers/page": {
+          "moduleId": "[project]/.next-internal/server/app/admin/volunteers/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/lib/email.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        }
+      },
+      "layer": {
+        "app/admin/volunteers/page": "action-browser"
+      }
+    }
+  },
+  "edge": {}
+}

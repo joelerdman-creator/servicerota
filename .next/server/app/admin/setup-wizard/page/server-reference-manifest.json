@@ -1,0 +1,16 @@
+{
+  "node": {
+    "400d21ae0c6020d0245377c7895a530c3db284a1f1": {
+      "workers": {
+        "app/admin/setup-wizard/page": {
+          "moduleId": "[project]/.next-internal/server/app/admin/setup-wizard/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/ai/flows/extract-schedule-data-flow.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        }
+      },
+      "layer": {
+        "app/admin/setup-wizard/page": "action-browser"
+      }
+    }
+  },
+  "edge": {}
+}

@@ -1,0 +1,27 @@
+{
+  "node": {
+    "402bfae193de3b92eae0d8f36e716c0bf483755897": {
+      "workers": {
+        "app/admin/services/page": {
+          "moduleId": "[project]/.next-internal/server/app/admin/services/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/ai/flows/parse-ics-flow.ts [app-rsc] (ecmascript)\", ACTIONS_MODULE1 => \"[project]/src/ai/flows/fetch-ics-from-url-flow.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        }
+      },
+      "layer": {
+        "app/admin/services/page": "action-browser"
+      }
+    },
+    "40aa6ae563fe55e7c2422e104220decf6d217adcca": {
+      "workers": {
+        "app/admin/services/page": {
+          "moduleId": "[project]/.next-internal/server/app/admin/services/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/ai/flows/parse-ics-flow.ts [app-rsc] (ecmascript)\", ACTIONS_MODULE1 => \"[project]/src/ai/flows/fetch-ics-from-url-flow.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        }
+      },
+      "layer": {
+        "app/admin/services/page": "action-browser"
+      }
+    }
+  },
+  "edge": {}
+}

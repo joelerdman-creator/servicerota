@@ -2,7 +2,7 @@
 const { spawn } = require("child_process");
 const { lernaScopes } = require("./github.js");
 
-const buildProcess = spawn("lerna", ["run", "build", "--scope", "firebase-ecommerce", "--include-dependencies", ...lernaScopes], {
+const buildProcess = spawn("lerna", ["run", "build", "--scope", "basic", "--include-dependencies", ...lernaScopes], {
   stdio: "inherit",
 });
 

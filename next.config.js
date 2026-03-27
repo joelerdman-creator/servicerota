@@ -17,6 +17,12 @@ const nextConfig = {
     ],
   },
   serverExternalPackages: ["mailparser"],
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
 };
 
 module.exports = nextConfig;

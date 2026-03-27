@@ -1,6 +1,6 @@
 // IMPORTANT: This file should only be imported by server-side code (e.g., API routes).
 
-import { initializeApp, getApps, App, cert, ServiceAccount } from "firebase-admin/app";
+import { initializeApp, getApps, App, cert, ServiceAccount, applicationDefault } from "firebase-admin/app";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 import { getAuth, Auth } from "firebase-admin/auth";
 
@@ -17,35 +17,45 @@ function initializeAdminApp(): App {
   const envEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const envProjectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
-  if (!envKey || !envEmail) {
-    const errorMessage = "Firebase Admin credentials (FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL) are not set in environment variables. Server-side functionality is disabled.";
-    initError = new Error(errorMessage);
-    console.error(`[Firebase Admin] ${initError.message}`);
-    debugInfo.source = 'error-no-credentials';
-    throw initError;
-  }
-
-  const serviceAccount: ServiceAccount = {
-    projectId: envProjectId, // Can be undefined, firebase-admin can infer
-    clientEmail: envEmail,
-    privateKey: envKey.replace(/\\n/g, '\n'),
-  };
-
-  debugInfo.source = 'environment';
-  debugInfo.projectId = serviceAccount.projectId;
-  debugInfo.clientEmail = serviceAccount.clientEmail;
-
   try {
     const existingApp = getApps().find((a) => a.name === "admin-app");
-    app =
-      existingApp ||
-      initializeApp(
+    if (existingApp) {
+      app = existingApp;
+      return app;
+    }
+
+    if (envKey && envEmail) {
+      // Use explicit manual credentials if provided (e.g., local .env)
+      const serviceAccount: ServiceAccount = {
+        projectId: envProjectId,
+        clientEmail: envEmail,
+        privateKey: envKey.replace(/\\n/g, '\n'),
+      };
+      
+      debugInfo.source = 'environment';
+      debugInfo.projectId = serviceAccount.projectId;
+      debugInfo.clientEmail = serviceAccount.clientEmail;
+
+      app = initializeApp(
         {
           credential: cert(serviceAccount),
           ...(serviceAccount.projectId && { projectId: serviceAccount.projectId }),
         },
         "admin-app",
       );
+    } else {
+      // Fallback to Application Default Credentials securely provided by Firebase App Hosting
+      debugInfo.source = 'application-default';
+      if (envProjectId) debugInfo.projectId = envProjectId;
+
+      app = initializeApp(
+        {
+          credential: applicationDefault(),
+          ...(envProjectId && { projectId: envProjectId }),
+        },
+        "admin-app",
+      );
+    }
     return app;
   } catch (error: any) {
     console.error("CRITICAL: Error initializing Firebase Admin App:", error.message);

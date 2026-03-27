@@ -1,0 +1,93 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- HELPER FUNCTIONS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSuperUser() {
+      // superUser status is determined SOLELY by the custom claim.
+      return request.auth.token.superUser == true;
+    }
+    
+    function isRequestingUser(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Checks if the requesting user is an admin of the specified church.
+    function isChurchAdmin(churchId) {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             userDoc.data.isAdmin == true &&
+             userDoc.data.churchId == churchId;
+    }
+    
+    // --- USER PROFILES ---
+    match /users/{userId} {
+      allow get: if isSuperUser() || isRequestingUser(userId) || isChurchAdmin(resource.data.churchId);
+      allow list: if isSuperUser() || isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSuperUser() || isRequestingUser(userId) || isChurchAdmin(resource.data.churchId);
+      allow delete: if isSuperUser() || isChurchAdmin(resource.data.churchId);
+    }
+
+    // --- CHURCH DATA & SUBCOLLECTIONS ---
+    match /churches/{churchId} {
+      allow get: if true;
+      allow create: if isSuperUser() || (isSignedIn() && request.resource.data.ownerId == request.auth.uid);
+      allow update: if isSuperUser() || isChurchAdmin(churchId);
+
+      // --- EVENTS ---
+      match /events/{eventId} {
+        // FIX: Use resource.data instead of get() for the document itself to avoid self-reference/recursion
+        allow get, list: if resource.data.isPublished == true || isChurchAdmin(churchId);
+        allow write: if isSuperUser() || isChurchAdmin(churchId);
+
+        // --- ROLES ---
+        match /roles/{roleId} {
+            // Keep get() here because we are checking the PARENT document
+            allow read, list: if get(/databases/$(database)/documents/churches/$(churchId)/events/$(eventId)).data.isPublished == true || isChurchAdmin(churchId);
+            allow create, delete: if isChurchAdmin(churchId);
+            allow update: if isChurchAdmin(churchId) || 
+                          (isRequestingUser(resource.data.assignedVolunteerId) && 
+                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
+        }
+      }
+
+      // --- TEMPLATES ---
+      match /role_templates/{roleTemplateId} {
+        allow read, write: if isSuperUser() || isChurchAdmin(churchId);
+      }
+      
+      match /service_templates/{serviceTemplateId} {
+        allow read, write: if isSuperUser() || isChurchAdmin(churchId);
+      }
+
+      // --- NOTIFICATIONS ---
+      match /notifications/{notificationId} {
+        allow read, list: if isChurchAdmin(churchId);
+        // Writes are handled by server-side actions, so no client-side write access is needed.
+        allow write: if false; 
+      }
+    }
+    
+    // --- SUPPORT TICKETS ---
+    match /support_tickets/{ticketId} {
+      allow create: if isSignedIn() && request.resource.data.submittedByUid == request.auth.uid;
+      allow get: if isSuperUser() || (isSignedIn() && resource.data.submittedByUid == request.auth.uid);
+      allow list: if isSuperUser() || isSignedIn();
+      allow update: if isSuperUser() || 
+                    (isSignedIn() && resource.data.submittedByUid == request.auth.uid && 
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'lastActivityAt']));
+      allow delete: if isSuperUser();
+      
+      match /comments/{commentId} {
+        allow read, list: if isSuperUser() || (isSignedIn() && get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.submittedByUid == request.auth.uid);
+        allow create: if isSuperUser() || (isSignedIn() && get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.submittedByUid == request.auth.uid);
+      }
+    }
+  }
+}

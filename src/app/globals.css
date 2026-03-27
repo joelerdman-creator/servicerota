@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 43 24% 96%; /* Warm Cream */
+    --foreground: 215 25% 27%; /* Slate Text */
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 215 25% 27%; /* Slate Text */
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 27%;
+    --primary: 226 87% 17%; /* Deep Navy */
+    --primary-foreground: 210 40% 98%; /* Almost White */
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%; /* Dark Navy */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 28 80% 52%; /* Orange Accent for focus */
+    --radius: 0.75rem;
+    --brand-accent-hsl: 28 80% 52%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 28 80% 52%;
+    --radius: 0.75rem;
+    --brand-accent-hsl: 28 80% 52%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+  h1,
+  h4,
+  h5,
+  h6,
+  strong,
+  b {
+    color: hsl(var(--primary));
+  }
+  h2,
+  h3 {
+    color: hsl(var(--brand-accent-hsl));
+  }
+}

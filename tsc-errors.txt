@@ -1,0 +1,1 @@
+﻿src/lib/scheduling/auto-assign.ts(176,38): error TS2802: Type 'MapIterator<[string, { assignmentCount: number; lastAssigned?: string | undefined; }]>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.

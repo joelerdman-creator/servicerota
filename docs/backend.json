@@ -1,0 +1,514 @@
+
+{
+  "entities": {
+    "Church": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Church",
+      "type": "object",
+      "description": "Represents a church within the multi-tenant ParishScribe application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Church entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the church."
+        },
+        "contactEmail": {
+          "type": "string",
+          "description": "The contact email address for the church.",
+          "format": "email"
+        },
+        "address": {
+          "type": "string",
+          "description": "The physical address of the church."
+        },
+        "denomination": {
+          "type": "string",
+          "description": "The denomination of the church.",
+          "enum": [
+            "Non-denominational",
+            "Baptist",
+            "Southern Baptist",
+            "Catholic",
+            "Catholic (Ordinariate)",
+            "Methodist",
+            "United Methodist",
+            "Lutheran",
+            "Lutheran (LCMS)",
+            "Lutheran (ELCA)",
+            "Presbyterian",
+            "Presbyterian (PCA)",
+            "Presbyterian (PCUSA)",
+            "Pentecostal",
+            "Episcopal/Anglican",
+            "Anglican (ACNA)",
+            "Churches of Christ",
+            "Mormon (LDS)",
+            "Assemblies of God",
+            "Orthodox (Eastern)",
+            "Orthodox (Greek)",
+            "Orthodox (Russian)",
+            "Other"
+          ]
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the user who created and owns the church."
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the church was created."
+        },
+        "logoUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "The URL of the uploaded church logo."
+        },
+        "calendarUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "The URL for the public iCal feed for event imports."
+        },
+        "primaryColor": {
+            "type": "string",
+            "description": "The primary brand color for the church, in hex format."
+        },
+        "secondaryColor": {
+            "type": "string",
+            "description": "The secondary brand color for the church, in hex format."
+        },
+        "accentColor": {
+            "type": "string",
+            "description": "The accent brand color for the church, in hex format."
+        },
+        "fontFamily": {
+            "type": "string",
+            "description": "The default font family for shared materials."
+        },
+        "onboardingCompleted": {
+            "type": "boolean",
+            "description": "Flag to indicate if the admin has completed the initial setup wizard.",
+            "default": false
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "ownerId"
+      ]
+    },
+    "Event": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Event",
+      "type": "object",
+      "description": "Represents a service or event scheduled within the church.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Event entity."
+        },
+        "churchId": {
+          "type": "string",
+          "description": "Reference to Church. (Relationship: Church 1:N Event)"
+        },
+        "eventName": {
+          "type": "string",
+          "description": "The name of the event (e.g., Sunday Morning Eucharist)."
+        },
+        "eventType": {
+            "type": "string",
+            "description": "The type of event.",
+            "enum": ["Service", "Generic Event"],
+            "default": "Service"
+        },
+        "eventDate": {
+          "type": "string",
+          "description": "The date and time of the event.",
+          "format": "date-time"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional notes or description for the event."
+        },
+        "isPublished": {
+          "type": "boolean",
+          "description": "Indicates if the event is visible to volunteers.",
+          "default": false
+        },
+        "isSignupEnabled": {
+            "type": "boolean",
+            "description": "Indicates if volunteers can sign themselves up for roles in this event.",
+            "default": false
+        },
+        "signupScope": {
+            "type": "string",
+            "description": "Determines which roles volunteers can see for sign-up.",
+            "enum": ["all_roles", "unassigned_only"],
+            "default": "unassigned_only"
+        },
+        "signupRequiresQualification": {
+            "type": "boolean",
+            "description": "If true, only volunteers with the role in their profile can sign up. If false, any volunteer can sign up.",
+            "default": true
+        },
+        "seriesId": {
+            "type": "string",
+            "description": "A unique identifier for a series of recurring events."
+        }
+      },
+      "required": [
+        "id",
+        "churchId",
+        "eventName",
+        "eventDate"
+      ]
+    },
+    "Role": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Role",
+      "type": "object",
+      "description": "Represents a volunteer role for a specific event.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Role entity."
+        },
+        "eventId": {
+          "type": "string",
+          "description": "Reference to Event. (Relationship: Event 1:N Role)"
+        },
+        "roleName": {
+          "type": "string",
+          "description": "The name of the volunteer role (e.g., Lector, Acolyte, Usher)."
+        },
+        "assignedVolunteerId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Role). The UID of the assigned volunteer."
+        },
+        "assignedVolunteerName": {
+          "type": "string",
+          "description": "The name of the assigned volunteer."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the volunteer assignment (Pending, Confirmed, Declined, Pending Substitution).",
+           "enum": ["Pending", "Confirmed", "Declined", "Pending Substitution"]
+        }
+      },
+      "required": [
+        "id",
+        "eventId",
+        "roleName"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user (volunteer or admin) in the system. Authentication data (password, etc.) are assumed to be handled externally.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity. This would likely correspond to the UID from the external authentication system (e.g. Firebase Auth)."
+        },
+        "churchId": {
+          "type": "string",
+          "description": "Reference to Church. (Relationship: Church 1:N User)"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the user."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the user. Can be null for admin-managed volunteers.",
+          "format": "email"
+        },
+        "isAdmin": {
+          "type": "boolean",
+          "description": "Indicates if the user has administrative privileges."
+        },
+        "isSuperUser": {
+            "type": "boolean",
+            "description": "Indicates if the user has platform-wide super administrative privileges. Primarily managed via custom claims."
+        },
+        "role": {
+          "type": "string",
+          "description": "The user's primary role in the application.",
+          "enum": ["admin", "volunteer"]
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the user profile was created."
+        },
+        "availableRoleIds": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "An array of RoleTemplate IDs that the volunteer is available to fill."
+        },
+        "availableRecurringEventSeriesIds": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "An array of event series IDs that the volunteer is available to serve at."
+        },
+        "assignmentCount": {
+          "type": "number",
+          "description": "The total number of times this volunteer has been assigned to a role."
+        },
+        "lastAssigned": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp of the last time this volunteer was assigned to a role."
+        },
+        "familyId": {
+          "type": "string",
+          "description": "The ID of the family this user belongs to. Can be the UID of the household manager."
+        },
+        "servingPreference": {
+          "type": "string",
+          "description": "The user's preference for serving with family members.",
+          "enum": ["ANY_TIME", "PREFER_FAMILY", "ONLY_WITH_FAMILY"]
+        },
+        "isHouseholdManager": {
+            "type": "boolean",
+            "description": "Indicates if this user is the primary contact for a family.",
+            "default": false
+        },
+        "status": {
+            "type": "string",
+            "description": "The status of the user account, used for family member approvals and invitations.",
+            "enum": ["active", "pending_approval", "pending_invitation"]
+        },
+        "unavailability": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "format": "date"
+            },
+            "description": "An array of dates (YYYY-MM-DD) when the volunteer is unavailable."
+        },
+        "isManagedByAdmin": {
+            "type": "boolean",
+            "description": "Indicates if this volunteer account is created and managed by an administrator, without its own login.",
+            "default": false
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName"
+      ]
+    },
+    "RoleTemplate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "RoleTemplate",
+      "type": "object",
+      "description": "Represents a reusable volunteer role template for a church.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the RoleTemplate entity."
+        },
+        "churchId": {
+          "type": "string",
+          "description": "Reference to Church, for multi-tenancy."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the role (e.g., Lector, Acolyte, Usher)."
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the role template was created."
+        }
+      },
+      "required": ["id", "churchId", "name"]
+    },
+    "ServiceTemplate": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "ServiceTemplate",
+        "type": "object",
+        "description": "A template for creating a service, with a predefined set of roles and recurrence info.",
+        "properties": {
+            "id": {
+                "type": "string",
+                "description": "Unique identifier for the ServiceTemplate."
+            },
+            "churchId": {
+                "type": "string",
+                "description": "The ID of the church this template belongs to."
+            },
+            "name": {
+                "type": "string",
+                "description": "The name of the service template (e.g. 'Sunday Morning Eucharist')."
+            },
+            "dayOfWeek": {
+                "type": "integer",
+                "description": "The day of the week for recurrence (0=Sunday, 1=Monday, etc.)."
+            },
+            "timeOfDay": {
+                "type": "string",
+                "description": "The time of day for recurrence in HH:mm format (24-hour)."
+            },
+            "roles": {
+                "type": "array",
+                "items": {
+                   "type": "object",
+                   "properties": {
+                        "name": {"type": "string"},
+                        "quantity": {"type": "number"}
+                   },
+                   "required": ["name", "quantity"]
+                },
+                "description": "An array of roles included in this service template."
+            }
+        },
+        "required": ["id", "churchId", "name"]
+    },
+    "SupportTicket": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SupportTicket",
+      "type": "object",
+      "description": "Represents a support ticket submitted by a user.",
+      "properties": {
+        "id": { "type": "string" },
+        "churchId": { "type": "string", "description": "The ID of the church this ticket is associated with." },
+        "submittedByUid": { "type": "string", "description": "The UID of the user who submitted the ticket." },
+        "submittedByName": { "type": "string", "description": "The name of the user who submitted the ticket." },
+        "subject": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["Open", "In Progress", "Closed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastActivityAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "submittedByUid", "subject", "description", "status", "createdAt"]
+    },
+    "TicketComment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TicketComment",
+      "type": "object",
+      "description": "Represents a comment on a support ticket.",
+      "properties": {
+        "id": { "type": "string" },
+        "ticketId": { "type": "string" },
+        "commentByUid": { "type": "string", "description": "The UID of the user who made the comment." },
+        "commentByName": { "type": "string", "description": "The name of the user who made the comment." },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ticketId", "commentByUid", "comment", "createdAt"]
+    },
+    "Notification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Notification",
+      "type": "object",
+      "description": "Represents a log of an email sent from the system.",
+      "properties": {
+        "id": { "type": "string" },
+        "churchId": { "type": "string" },
+        "recipientEmail": { "type": "string", "format": "email" },
+        "subject": { "type": "string" },
+        "sentAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["Sent", "Failed"] },
+        "errorMessage": { "type": "string", "description": "The error message if the email failed to send." },
+        "emailContent": { "type": "string", "description": "The full HTML content of the email." },
+        "type": { "type": "string", "description": "The type of notification that was sent." }
+      },
+      "required": ["id", "churchId", "recipientEmail", "subject", "sentAt", "status", "emailContent"]
+    },
+    "SeriesMetadata": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SeriesMetadata",
+      "type": "object",
+      "description": "Stores settings for a recurring event series.",
+      "properties": {
+        "seriesId": {
+          "type": "string",
+          "description": "The unique identifier for the event series this metadata applies to."
+        },
+        "isPerpetual": {
+          "type": "boolean",
+          "description": "If true, the series should automatically be extended to always have events scheduled for a year out."
+        },
+        "rruleString": {
+          "type": "string",
+          "description": "The RRule string defining the recurrence pattern (e.g. FREQ=WEEKLY;BYDAY=SU)."
+        }
+      },
+      "required": ["seriesId", "isPerpetual"]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "google.com"
+    ]
+  },
+  "firestore": {
+    "/churches/{churchId}": {
+        "schema": {
+            "$ref": "#/entities/Church"
+        },
+        "description": "Stores information about each individual church tenant."
+    },
+    "/churches/{churchId}/events/{eventId}": {
+      "schema": {
+        "$ref": "#/entities/Event"
+      },
+      "description": "Stores event details as a subcollection of a church."
+    },
+    "/churches/{churchId}/events/{eventId}/roles/{roleId}": {
+      "schema": {
+        "$ref": "#/entities/Role"
+      },
+      "description": "Stores roles associated with an event as a subcollection."
+    },
+    "/churches/{churchId}/role_templates/{roleTemplateId}": {
+        "schema": { "$ref": "#/entities/RoleTemplate"},
+        "description": "Stores reusable role templates for a specific church."
+    },
+    "/churches/{churchId}/service_templates/{serviceTemplateId}": {
+        "schema": { "$ref": "#/entities/ServiceTemplate"},
+        "description": "Stores reusable service templates for a specific church."
+    },
+    "/churches/{churchId}/notifications/{notificationId}": {
+        "schema": { "$ref": "#/entities/Notification"},
+        "description": "Stores a log of all outgoing email notifications for a church."
+    },
+    "/churches/{churchId}/series_metadata/{seriesId}": {
+        "schema": { "$ref": "#/entities/SeriesMetadata" },
+        "description": "Stores metadata and settings for recurring event series."
+    },
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "Stores user profiles. Path-based ownership ensures only the user or an admin can access it."
+    },
+    "/support_tickets/{ticketId}": {
+      "schema": {
+        "$ref": "#/entities/SupportTicket"
+      },
+      "description": "Stores support tickets submitted by users."
+    },
+    "/support_tickets/{ticketId}/comments/{commentId}": {
+      "schema": {
+        "$ref": "#/entities/TicketComment"
+      },
+      "description": "Stores comments for a specific support ticket."
+    }
+  }
+}

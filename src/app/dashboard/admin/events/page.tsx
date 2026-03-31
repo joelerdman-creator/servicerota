@@ -31,7 +31,6 @@ import {
   Edit,
   ChevronLeft,
   ChevronRight,
-  Calendar as CalendarIcon,
   Plus,
   Minus,
 } from "lucide-react";
@@ -307,7 +306,10 @@ export default function EventsPage() {
       const volunteerMap = new Map(volunteers?.map((v) => [v.id, v]));
 
       for (const assignment of allAssignedRoles) {
-        const volunteer = volunteerMap.get(assignment.volunteerId!);
+        // assignmentPlan entries use `volunteerId`; Role documents use `assignedVolunteerId`
+        const resolvedVolunteerId =
+          (assignment as any).volunteerId ?? (assignment as any).assignedVolunteerId;
+        const volunteer = volunteerMap.get(resolvedVolunteerId!);
         if (!volunteer) continue;
         const recipientId = volunteer.isHouseholdManager === false && volunteer.familyId ? volunteer.familyId : volunteer.id;
         const recipient = volunteerMap.get(recipientId);

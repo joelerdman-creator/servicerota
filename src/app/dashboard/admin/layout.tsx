@@ -141,7 +141,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex flex-col min-h-screen">
       {/* Top Header / "Blue Bar" */}
-      <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-30">
+      <header className="bg-nav text-nav-foreground shadow-md sticky top-0 z-30">
         <div className="container mx-auto px-4 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-2">
@@ -150,12 +150,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <span className="hidden sm:inline">Parish Scribe</span>
               </Link>
 
-              <span className="hidden sm:inline text-primary-foreground/40 font-light mx-1 text-xl">/</span>
+              <span className="hidden sm:inline text-nav-foreground/40 font-light mx-1 text-xl">/</span>
 
               {/* Desktop Module Switcher Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="hidden sm:flex items-center gap-2 text-primary-foreground hover:bg-white/10 hover:text-white px-2 py-1 h-auto font-medium text-base">
+                  <Button variant="ghost" className="hidden sm:flex items-center gap-2 text-nav-foreground hover:bg-white/10 hover:text-white px-2 py-1 h-auto font-medium text-base">
                     <activeModule.icon className="h-[18px] w-[18px] text-brand-accent" />
                     <span>{activeModule.name}</span>
                     <ChevronDown className="h-4 w-4 opacity-70" />
@@ -177,7 +177,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     href={item.href}
                     className={cn(
                       "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-white/10",
-                      isActive ? "bg-white/20 text-white" : "text-primary-foreground/80"
+                      isActive ? "bg-white/20 text-white" : "text-nav-foreground/80"
                     )}
                   >
                     <item.icon className="h-4 w-4" />
@@ -192,7 +192,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {/* Mobile Navigation Toggle */}
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden text-primary-foreground">
+                <Button variant="ghost" size="icon" className="lg:hidden text-nav-foreground">
                   <Menu className="h-6 w-6" />
                   <span className="sr-only">Toggle navigation menu</span>
                 </Button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, errorEmitter, WithId } from "@/firebase";
 import { doc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs, limit } from "firebase/firestore";
 import Link from "next/link";
@@ -38,6 +38,14 @@ export default function VolunteerPreferencesPage() {
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingRole, setIsSavingRole] = useState(false);
+  const saveToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerSavedToast = useCallback(() => {
+    if (saveToastTimer.current) clearTimeout(saveToastTimer.current);
+    saveToastTimer.current = setTimeout(() => {
+      toast.success("All changes saved.");
+    }, 800);
+  }, []);
 
   // --- Data Fetching ---
   const userDocRef = useMemoFirebase(
@@ -111,7 +119,7 @@ export default function VolunteerPreferencesPage() {
       await updateDoc(userDocRef, {
         availableRecurringEventSeriesIds: isChecked ? arrayUnion(seriesId) : arrayRemove(seriesId),
       });
-      toast.success("Your service preferences have been updated.");
+      triggerSavedToast();
     } catch (e: unknown) {
       toast.error("Failed to update preferences.");
       setSelectedServices(originalSelection); // Revert UI on error
@@ -142,7 +150,7 @@ export default function VolunteerPreferencesPage() {
       await updateDoc(userDocRef, {
         availableRoleIds: isChecked ? arrayUnion(roleId) : arrayRemove(roleId),
       });
-      toast.success("Your role preferences have been updated.");
+      triggerSavedToast();
     } catch (e: unknown) {
       toast.error("Failed to update role preferences.");
       setSelectedRoles(originalSelection); // Revert UI on error

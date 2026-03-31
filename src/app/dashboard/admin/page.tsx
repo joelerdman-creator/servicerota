@@ -4,7 +4,7 @@
 import { useUser, useFirestore, useCollection, useDoc } from "@/firebase";
 import { useMemoFirebase } from "@/firebase/hooks/use-memo-firebase";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { UserCheck, EyeOff, Users, CalendarIcon, Loader2, Sparkles, ArrowRight, AlertTriangle } from "lucide-react";
+import { UserCheck, EyeOff, Users, CalendarIcon, Loader2, Sparkles, ArrowRight, AlertTriangle, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
 import {
   collection,
@@ -13,7 +13,6 @@ import {
   doc,
   orderBy,
   getDocs,
-  Timestamp,
 } from "firebase/firestore";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
@@ -29,7 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface UserProfile {
@@ -97,8 +96,9 @@ export default function AdminDashboardPage() {
     ),
   );
 
+  // Stats: derived from allUsers (already fetched via useCollection) + events fetch
   useEffect(() => {
-    if (!firestore || !adminProfile?.churchId) {
+    if (!firestore || !adminProfile?.churchId || usersLoading) {
       return;
     }
 
@@ -107,18 +107,11 @@ export default function AdminDashboardPage() {
       setLoadingReports(true);
       const churchId = adminProfile.churchId;
 
-      // --- Fetch data for stats widgets ---
-      const usersQuery = query(collection(firestore, "users"), where("churchId", "==", churchId));
-      const eventsQuery = collection(firestore, "churches", churchId, "events");
-
-      const [usersSnapshot, eventsSnapshot] = await Promise.all([
-        getDocs(usersQuery),
-        getDocs(eventsQuery),
-      ]);
-
-      const userList = usersSnapshot.docs.map((d) => d.data());
+      // --- Stats widgets: use allUsers already fetched via useCollection ---
+      const eventsSnapshot = await getDocs(collection(firestore, "churches", churchId, "events"));
       const eventList = eventsSnapshot.docs.map((d) => d.data());
 
+      const userList = allUsers ?? [];
       const now = new Date();
       const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
       const sixtyDaysFromNow = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
@@ -133,8 +126,8 @@ export default function AdminDashboardPage() {
       };
 
       setStats({
-        pendingVolunteers: userList.filter((u) => u.status === "pending_approval").length,
-        totalVolunteers: userList.length,
+        pendingVolunteers: userList.filter((u: any) => u.status === "pending_approval").length,
+        totalVolunteers: userList.filter((u: any) => u.role !== "admin").length,
         unpublishedEvents30: filterByDateRange(unpublishedEvents, now, thirtyDaysFromNow),
         unpublishedEvents60: filterByDateRange(
           unpublishedEvents,
@@ -208,7 +201,7 @@ export default function AdminDashboardPage() {
     };
 
     fetchDashboardData();
-  }, [firestore, adminProfile, dateRange]);
+  }, [firestore, adminProfile, dateRange, allUsers, usersLoading]);
 
   const volunteerHistoryReport = useMemo(() => {
     if (!allUsers) return [];
@@ -283,7 +276,7 @@ export default function AdminDashboardPage() {
                 ) : reportData.openRolesCount > 0 ? (
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-muted-foreground">
-                      Everything looks good! Enjoy <span className="font-bold text-foreground">{reportData.openRolesCount} pending role{reportData.openRolesCount > 1 ? "s" : ""}</span> in the upcoming schedule. Consider running the <span className="font-semibold">Auto-Assign Wizard</span> to fill them.
+                      Your events are published, but <span className="font-bold text-foreground">{reportData.openRolesCount} role{reportData.openRolesCount > 1 ? "s" : ""}</span> still {reportData.openRolesCount > 1 ? "need" : "needs"} volunteers. Run the <span className="font-semibold">Auto-Assign Wizard</span> to fill them quickly.
                     </p>
                     <Link href="/dashboard/admin/schedule-wizard">
                       <Button size="sm" variant="outline" className="ml-4 shrink-0">
@@ -347,7 +340,9 @@ export default function AdminDashboardPage() {
                     {loadingStats ? "..." : stats.unpublishedEvents30}
                   </p>
                   {!loadingStats && stats.unpublishedEvents30 > 0 && (
-                    <p className="text-xs text-destructive font-medium mt-1">🔴 Urgent</p>
+                    <p className="text-xs text-destructive font-medium mt-1 flex items-center justify-center gap-1">
+                      <AlertCircle className="h-3 w-3" /> Urgent
+                    </p>
                   )}
                 </div>
                 <div>
@@ -358,7 +353,9 @@ export default function AdminDashboardPage() {
                     {loadingStats ? "..." : stats.unpublishedEvents60}
                   </p>
                   {!loadingStats && stats.unpublishedEvents60 > 0 && (
-                    <p className="text-xs text-yellow-600 dark:text-yellow-400 font-medium mt-1">🟡 Approaching</p>
+                    <p className="text-xs text-yellow-600 dark:text-yellow-400 font-medium mt-1 flex items-center justify-center gap-1">
+                      <Clock className="h-3 w-3" /> Approaching
+                    </p>
                   )}
                 </div>
                 <div>
@@ -369,7 +366,9 @@ export default function AdminDashboardPage() {
                     {loadingStats ? "..." : stats.unpublishedEvents90}
                   </p>
                   {!loadingStats && stats.unpublishedEvents90 > 0 && (
-                    <p className="text-xs text-green-600 dark:text-green-400 font-medium mt-1">🟢 Healthy</p>
+                    <p className="text-xs text-green-600 dark:text-green-400 font-medium mt-1 flex items-center justify-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" /> Healthy
+                    </p>
                   )}
                 </div>
               </div>
@@ -390,7 +389,7 @@ export default function AdminDashboardPage() {
                 {loadingStats ? "..." : stats.totalVolunteers}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                All registered users in your church
+                Active volunteers (excludes admins)
               </p>
             </CardContent>
           </Card>
@@ -431,6 +430,38 @@ export default function AdminDashboardPage() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
+              <div className="flex gap-1 p-2 border-b">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs"
+                  onClick={() => setDateRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}
+                >
+                  This Month
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs"
+                  onClick={() => {
+                    const last = subMonths(new Date(), 1);
+                    setDateRange({ from: startOfMonth(last), to: endOfMonth(last) });
+                  }}
+                >
+                  Last Month
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs"
+                  onClick={() => {
+                    const threeMonthsAgo = subMonths(new Date(), 3);
+                    setDateRange({ from: startOfDay(startOfMonth(threeMonthsAgo)), to: endOfDay(endOfMonth(new Date())) });
+                  }}
+                >
+                  Last 3 Months
+                </Button>
+              </div>
               <Calendar
                 initialFocus
                 mode="range"
@@ -515,7 +546,7 @@ export default function AdminDashboardPage() {
                                   <span>{fillRate}%</span>
                                   <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
                                     <div
-                                      className="h-full bg-primary"
+                                      className="h-full bg-brand-accent"
                                       style={{ width: `${fillRate}%` }}
                                     />
                                   </div>

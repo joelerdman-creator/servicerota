@@ -549,7 +549,10 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {isLoading ? (
-              <p>Loading settings...</p>
+              <div className="flex items-center gap-2 text-muted-foreground py-4">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm">Loading settings...</span>
+              </div>
             ) : (
               <>
                 <div className="space-y-2">
@@ -821,7 +824,7 @@ export default function SettingsPage() {
                               onClick={() => toggleRoleSelection(role.id)}
                             >
                               {selectedRoleIds.has(role.id) ? (
-                                <CheckSquare className="h-4 w-4 text-primary" />
+                                <CheckSquare className="h-4 w-4 text-brand-accent" />
                               ) : (
                                 <Square className="h-4 w-4 text-muted-foreground" />
                               )}

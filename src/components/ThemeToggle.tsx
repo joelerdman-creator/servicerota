@@ -39,7 +39,7 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       onClick={toggle}
-      className="text-primary-foreground hover:bg-white/10"
+      className="text-nav-foreground hover:bg-white/10"
       aria-label="Toggle dark mode"
     >
       {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

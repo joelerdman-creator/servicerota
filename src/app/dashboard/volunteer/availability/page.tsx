@@ -222,7 +222,12 @@ export default function AvailabilityPage() {
                       Select All
                     </Button>
                   </div>
-                  {isLoading && <p>Loading family...</p>}
+                  {isLoading && (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                      Loading...
+                    </div>
+                  )}
                   <div className="space-y-3 max-h-48 overflow-y-auto pr-2 -mr-2">
                     {allFamilyMembers?.map((member) => (
                       <div
@@ -260,14 +265,14 @@ export default function AvailabilityPage() {
                   Mark as Unavailable
                 </Button>
                 <Button
-                  variant="destructive"
+                  variant="outline"
                   className="w-full"
                   onClick={() => handleApplyUnavailability("remove")}
                   disabled={
                     isSubmitting || selectedDates.length === 0 || selectedFamilyMembers.size === 0
                   }
                 >
-                  Mark as Available
+                  Remove Block-out
                 </Button>
               </CardFooter>
             </Card>

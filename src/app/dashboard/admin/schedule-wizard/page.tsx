@@ -47,7 +47,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check, Bell } from "lucide-react";
 import { autoAssignVolunteers } from "@/lib/scheduling/auto-assign";
 import type { AssignmentPlan, AutoAssignInput } from "@/lib/scheduling/types";
 import toast from "react-hot-toast";
@@ -110,7 +110,7 @@ interface ServiceTemplate {
 // --- WIZARD STEPS ---
 const steps = [
   { label: "Select Events" },
-  { label: "Auto-Assign" },
+  { label: "Review Assignments" },
   { label: "Confirmation" },
 ];
 
@@ -464,7 +464,12 @@ export default function ScheduleWizardPage() {
   };
 
   const isLoading = isProfileLoading || volunteersLoading || rolesLoading || serviceTemplatesLoading;
-  if (isLoading) return <p>Loading wizard dependencies...</p>;
+  if (isLoading) return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 text-muted-foreground">
+      <Loader2 className="h-8 w-8 animate-spin" />
+      <p>Loading wizard data...</p>
+    </div>
+  );
 
   const renderStepContent = () => {
     switch (stepper.activeStep) {
@@ -487,10 +492,15 @@ export default function ScheduleWizardPage() {
       case 1:
         return (
           <WizardStep
-            title="Step 2: Auto-Assign Volunteers"
-            description="Review the proposed assignments based on volunteer availability and fairness rules."
+            title="Step 2: Review Assignments"
+            description="Review the proposed assignments below, then confirm to save them to your schedule."
           >
-            <AssignmentReview plan={assignmentPlan} events={eventsToAssign} />
+            <AssignmentReview
+              plan={assignmentPlan}
+              events={eventsToAssign}
+              isPublished={isPublished}
+              setIsPublished={setIsPublished}
+            />
           </WizardStep>
         );
       case 2:
@@ -692,11 +702,21 @@ function SelectEventsForm({
   );
 }
 
-function AssignmentReview({ plan, events }: { plan: AssignmentPlan | null; events: DbEvent[] }) {
+function AssignmentReview({
+  plan,
+  events,
+  isPublished,
+  setIsPublished,
+}: {
+  plan: AssignmentPlan | null;
+  events: DbEvent[];
+  isPublished: boolean;
+  setIsPublished: (v: boolean) => void;
+}) {
   if (!plan)
     return (
       <p className="text-muted-foreground text-center py-8">
-        Assignments will be shown here after the previous step is complete.
+        Assignments will appear here once generated. Click &ldquo;Next&rdquo; on Step 1 to run auto-assign.
       </p>
     );
 
@@ -704,7 +724,7 @@ function AssignmentReview({ plan, events }: { plan: AssignmentPlan | null; event
     const event = events.find((e) => e.id === eventId);
     if (!event) return "Unknown Event";
     return `${event.eventName} (${format(new Date(event.eventDate), "MMM d")})`;
-  }
+  };
 
   return (
     <div className="space-y-4">
@@ -743,6 +763,27 @@ function AssignmentReview({ plan, events }: { plan: AssignmentPlan | null; event
           </TableBody>
         </Table>
       </div>
+      <div
+        className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => setIsPublished(!isPublished)}
+      >
+        <Checkbox
+          id="notify-volunteers"
+          checked={isPublished}
+          onCheckedChange={(v) => setIsPublished(!!v)}
+        />
+        <div className="flex items-center gap-2">
+          <Bell className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <Label htmlFor="notify-volunteers" className="font-medium cursor-pointer">
+              Send email notifications to volunteers
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Each assigned volunteer (or their household manager) will receive a confirmation email.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -761,7 +802,7 @@ function ConfirmationView({
   return (
     <div className="text-center py-16 space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-primary mb-4">{canUndo ? "Success!" : "Rolled Back"}</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-4">{canUndo ? "Success!" : "Rolled Back"}</h2>
         <p className="text-lg text-muted-foreground">{message}</p>
       </div>
       <div className="flex justify-center gap-4">

@@ -1,0 +1,5 @@
+env:
+  - variable: RESEND_API_KEY
+    secret: RESEND_API_KEY
+  - variable: FROM_EMAIL
+    secret: FROM_EMAIL

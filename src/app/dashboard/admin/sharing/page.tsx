@@ -649,7 +649,11 @@ export default function SharingPage() {
         <h1 className="text-3xl font-bold">Sharing &amp; Notifications</h1>
         <p className="text-muted-foreground">Share schedules, get embed codes, and view email history.</p>
       </header>
-      {dataIsLoading && <p>Loading sharing options...</p>}
+      {dataIsLoading && (
+        <div className="flex items-center justify-center min-h-[300px]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      )}
       {!dataIsLoading && userProfile?.churchId && (
         <Tabs defaultValue="notifications">
           <TabsList className="grid w-full grid-cols-5 max-w-3xl">
@@ -749,8 +753,38 @@ export default function SharingPage() {
               <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="md:col-span-1 space-y-6">
                   <div>
+                    <Label className="text-base">Hero Image</Label>
+                    <p className="text-sm text-muted-foreground mb-2">Upload a photo for the top of the flyer.</p>
+                    <div className="flex flex-col gap-2">
+                      <label
+                        htmlFor="flyer-image-upload"
+                        className="flex items-center justify-center gap-2 cursor-pointer border-2 border-dashed rounded-md p-4 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
+                      >
+                        <Download className="h-4 w-4 rotate-180" />
+                        {flyerImageUrl ? "Replace image" : "Upload image"}
+                        <input
+                          id="flyer-image-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleFlyerImageUpload}
+                        />
+                      </label>
+                      {flyerImageUrl && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-muted-foreground"
+                          onClick={() => setFlyerImageUrl(undefined)}
+                        >
+                          Remove image
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div>
                     <Label className="text-base">Roles to Display</Label><p className="text-sm text-muted-foreground mb-2">Select the roles to feature on the flyer.</p>
-                    <div className="max-h-96 overflow-y-auto space-y-2 border rounded-md p-4">
+                    <div className="max-h-60 overflow-y-auto space-y-2 border rounded-md p-4">
                       {areRolesLoading && <p>Loading roles...</p>}
                       {roleTemplates?.map((role) => (<div key={role.id} className="flex items-center gap-3 cursor-pointer p-1 rounded-md hover:bg-muted" onClick={() => toggleFlyerRole(role.name)}>{selectedFlyerRoles.has(role.name) ? (<CheckSquare className="h-5 w-5 text-brand-accent" />) : (<Square className="h-5 w-5 text-muted-foreground" />)}<span className="font-medium">{role.name}</span></div>))}
                     </div>
@@ -768,7 +802,14 @@ export default function SharingPage() {
           </TabsContent>
         </Tabs>
       )}
-      {!dataIsLoading && !userProfile?.churchId && <p>Could not load sharing information.</p>}
+      {!dataIsLoading && !userProfile?.churchId && (
+        <Card className="border-destructive/30">
+          <CardContent className="flex items-center gap-3 pt-6 text-destructive">
+            <Church className="h-5 w-5 shrink-0" />
+            <p>Could not load sharing information. Please contact support.</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

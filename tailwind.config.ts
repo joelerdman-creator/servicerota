@@ -51,6 +51,10 @@ const config: Config = {
           foreground: "hsl(var(--card-foreground))",
         },
         "brand-accent": "hsl(28, 80%, 52%)",
+        nav: {
+          DEFAULT: "hsl(var(--nav-bg))",
+          foreground: "hsl(var(--nav-fg))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

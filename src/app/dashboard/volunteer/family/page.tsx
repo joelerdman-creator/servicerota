@@ -193,7 +193,10 @@ export default function FamilyPage() {
               </CardHeader>
               <CardContent>
                 {isLoading ? (
-                  <p>Loading preferences...</p>
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                    Loading...
+                  </div>
                 ) : (
                   <RadioGroup
                     defaultValue={userProfile?.servingPreference || "ANY_TIME"}
@@ -223,7 +226,12 @@ export default function FamilyPage() {
                 <CardDescription>Add or view members of your household.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {isLoading && <p>Loading family members...</p>}
+                {isLoading && (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                    Loading...
+                  </div>
+                )}
                 {!isLoading && (!familyMembers || familyMembers.length === 0) && !userProfile?.familyId && (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     You haven't created a family group yet.
@@ -249,7 +257,7 @@ export default function FamilyPage() {
                           {member.firstName} {member.lastName}
                           {member.isHouseholdManager && (
                             <div title="Household Manager">
-                              <ShieldCheck className="h-4 w-4 text-primary" />
+                              <ShieldCheck className="h-4 w-4 text-brand-accent" />
                             </div>
                           )}
                         </p>

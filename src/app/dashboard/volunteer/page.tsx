@@ -11,7 +11,7 @@ import Link from "next/link";
 import { doc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Calendar, Users, CalendarOff, LifeBuoy, ListTodo } from "lucide-react";
+import { Calendar, Users, CalendarOff, LifeBuoy, ListTodo, UserCircle } from "lucide-react";
 
 interface UserProfile {
   isAdmin?: boolean;
@@ -110,6 +110,21 @@ export default function VolunteerDashboardPage() {
               <CardContent className="flex-grow">
                 <p className="text-muted-foreground">
                   Manage your household and set serving preferences.
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/dashboard/volunteer/profile" className="flex">
+            <Card className="hover:bg-muted/50 transition-colors h-full w-full flex flex-col group border-brand-accent/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <UserCircle className="h-8 w-8 text-brand-accent" />
+                  My Profile
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-grow">
+                <p className="text-muted-foreground">
+                  Update your name and profile photo.
                 </p>
               </CardContent>
             </Card>

@@ -6,7 +6,6 @@ import {
   Share2,
   LifeBuoy,
   Briefcase,
-  Ticket,
   HeartHandshake,
   type LucideIcon,
 } from "lucide-react";
@@ -50,15 +49,6 @@ export const MODULES: ScribeModule[] = [
     description: "Board & Committee Management",
     icon: Briefcase,
     basePath: "/dashboard/admin/vestry",
-    isActive: false,
-    navItems: [],
-  },
-  {
-    id: "event",
-    name: "EventScribe",
-    description: "Event Registration & Tickets",
-    icon: Ticket,
-    basePath: "/dashboard/admin/events", // Will uniquely route when active
     isActive: false,
     navItems: [],
   },

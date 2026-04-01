@@ -147,7 +147,7 @@ export function CreateEventDialog({
       if (seriesId) {
         const metadataRef = doc(firestore, `churches/${userProfile.churchId}/series_metadata`, seriesId);
         const rule = new RRule({ freq: RRule.WEEKLY, dtstart: new Date(combinedStartDateTime) });
-        batch.set(metadataRef, { seriesId, isPerpetual: false, rruleString: rule.toString() });
+        batch.set(metadataRef, { seriesId, endDate: recurrenceEndDate || null, rruleString: rule.toString() });
       }
 
       for (const date of eventDates) {
@@ -267,7 +267,7 @@ export function CreateEventDialog({
               <div className="space-y-2 col-span-2">
                 <Label htmlFor="recurrence-end-date">End Date (Optional)</Label>
                 <Input id="recurrence-end-date" type="date" value={recurrenceEndDate} onChange={(e) => setRecurrenceEndDate(e.target.value)} />
-                <p className="text-xs text-muted-foreground">If omitted, defaults to 1 year.</p>
+                <p className="text-xs text-muted-foreground">Leave blank for an ongoing series that&apos;s automatically maintained.</p>
               </div>
             )}
           </div>

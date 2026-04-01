@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { useAuth, useUser, useFirestore, WithId } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, limit } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import GoogleIcon from "@/components/icons/google";
 import toast from "react-hot-toast";
@@ -22,17 +22,22 @@ import {
 } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { sendNotification } from "@/ai/flows/send-notification-flow";
 
 // --- TYPES ---
 interface Role {
   id: string;
   roleName: string;
   assignedVolunteerId: string | null;
+  originalVolunteerId?: string | null;
   status: "Pending" | "Confirmed" | "Declined" | "Pending Substitution";
 }
 interface Event {
   eventName: string;
   eventDate: string;
+}
+interface ChurchProfile {
+  name?: string;
 }
 
 function ClaimSubstitution() {
@@ -107,13 +112,47 @@ function ClaimSubstitution() {
         throw new Error("Sorry, this role has just been taken by someone else.");
       }
 
+      const freshRoleData = freshRoleSnap.data() as Role;
+
       const updateData = {
         assignedVolunteerId: user.uid,
         assignedVolunteerName: user.displayName,
         status: "Confirmed",
+        originalVolunteerId: null, // Clear the field
       };
 
       await updateDoc(roleRef, updateData);
+
+      // Notify the original volunteer that their sub has been filled
+      if (freshRoleData.originalVolunteerId && eventDetails) {
+        try {
+          const originalUserSnap = await getDoc(doc(firestore, "users", freshRoleData.originalVolunteerId));
+          const churchSnap = await getDoc(doc(firestore, "churches", churchId));
+          if (originalUserSnap.exists()) {
+            const originalUser = originalUserSnap.data() as { firstName?: string; lastName?: string; email?: string | null; phone?: string; smsOptIn?: boolean };
+            const church = churchSnap.exists() ? churchSnap.data() as ChurchProfile : null;
+            if (originalUser.email) {
+              void sendNotification({
+                type: "substitution_claimed",
+                toEmail: originalUser.email,
+                toPhone: originalUser.phone,
+                smsOptIn: originalUser.smsOptIn,
+                originalVolunteerName: `${originalUser.firstName || ""} ${originalUser.lastName || ""}`,
+                claimedByName: user.displayName || "A volunteer",
+                eventName: eventDetails.eventName,
+                eventDate: eventDetails.eventDate,
+                roleName: roleToClaim.roleName,
+                churchName: church?.name || "your church",
+                loginUrl: `${window.location.origin}/dashboard`,
+                churchId,
+              });
+            }
+          }
+        } catch (notifyErr) {
+          console.error("Failed to notify original volunteer:", notifyErr);
+        }
+      }
+
       toast.success("You've successfully claimed the role! Redirecting...");
       router.push("/dashboard/volunteer/schedule");
     } catch (e: any) {

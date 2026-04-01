@@ -63,6 +63,7 @@ import type { Firestore } from "firebase/firestore";
 import { useCollection, useMemoFirebase, WithId } from "@/firebase";
 import { autoAssignVolunteers } from "@/lib/scheduling/auto-assign";
 import { VolunteerCombobox } from "@/components/VolunteerCombobox";
+import { sendNotification } from "@/ai/flows/send-notification-flow";
 import type {
   DbEvent,
   UserProfile,
@@ -83,6 +84,7 @@ interface EventDetailSheetProps {
   volunteersLoading: boolean;
   roleTemplates: WithId<{ id: string; name: string }>[] | null;
   onOpenCreateTemplate: () => void;
+  churchName?: string;
 }
 
 export function EventDetailSheet({
@@ -95,6 +97,7 @@ export function EventDetailSheet({
   volunteersLoading,
   roleTemplates,
   onOpenCreateTemplate,
+  churchName,
 }: EventDetailSheetProps) {
   const [editForm, setEditForm] = useState({
     eventName: "",
@@ -117,6 +120,11 @@ export function EventDetailSheet({
   const [singleEventAssignmentPlan, setSingleEventAssignmentPlan] = useState<AssignmentPlan | null>(null);
   const [oneTimeVolunteerRole, setOneTimeVolunteerRole] = useState<string | null>(null);
   const [oneTimeVolunteerName, setOneTimeVolunteerName] = useState("");
+  const [conflictWarning, setConflictWarning] = useState<{
+    volunteer: WithId<Volunteer>;
+    roleId: string;
+    conflictingRoleName: string;
+  } | null>(null);
 
   // Roles query for editing modal
   const eventRolesQuery = useMemoFirebase(
@@ -259,19 +267,48 @@ export function EventDetailSheet({
     }
   };
 
+  const doAssignVolunteerToRole = async (roleId: string, volunteer: WithId<Volunteer> | null) => {
+    if (!userProfile?.churchId || !editingEvent) return;
+    await updateDoc(doc(firestore, `churches/${userProfile.churchId}/events/${editingEvent.id}/roles`, roleId), {
+      assignedVolunteerId: volunteer ? volunteer.id : null,
+      assignedVolunteerName: volunteer ? `${volunteer.firstName} ${volunteer.lastName}` : null,
+      status: volunteer ? "Confirmed" : "Pending",
+    });
+    if (volunteer && editingEvent.isPublished && volunteer.email) {
+      void sendNotification({
+        type: "assignment",
+        toEmail: volunteer.email,
+        toPhone: (volunteer as any).phone,
+        smsOptIn: (volunteer as any).smsOptIn,
+        volunteerName: `${volunteer.firstName} ${volunteer.lastName}`,
+        eventName: editingEvent.eventName,
+        eventDate: editingEvent.eventDate,
+        roleName: eventRoles?.find(r => r.id === roleId)?.roleName || "Volunteer",
+        churchName: churchName || "your church",
+        churchId: userProfile.churchId,
+      });
+    }
+    toast.success("Assignment updated.");
+  };
+
   const handleAssignVolunteerToRole = async (roleId: string, volunteer: WithId<Volunteer> | null | undefined) => {
     if (!userProfile?.churchId || !editingEvent) return;
     if (volunteer === undefined) {
       setOneTimeVolunteerRole(roleId);
       return;
     }
+    // Check for duplicate assignment on this event
+    if (volunteer) {
+      const duplicate = eventRoles?.find(
+        (r) => r.id !== roleId && r.assignedVolunteerId === volunteer.id
+      );
+      if (duplicate) {
+        setConflictWarning({ volunteer, roleId, conflictingRoleName: duplicate.roleName });
+        return;
+      }
+    }
     try {
-      await updateDoc(doc(firestore, `churches/${userProfile.churchId}/events/${editingEvent.id}/roles`, roleId), {
-        assignedVolunteerId: volunteer ? volunteer.id : null,
-        assignedVolunteerName: volunteer ? `${volunteer.firstName} ${volunteer.lastName}` : null,
-        status: volunteer ? "Confirmed" : "Pending",
-      });
-      toast.success("Assignment updated.");
+      await doAssignVolunteerToRole(roleId, volunteer);
     } catch {
       toast.error("Failed to update assignment.");
     }
@@ -638,6 +675,36 @@ export function EventDetailSheet({
             <AlertDialogAction onClick={handleConfirmSingleEventAssignment} disabled={isAutoAssigning || !singleEventAssignmentPlan?.assignments.length}>
               {isAutoAssigning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Confirm &amp; Apply
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Conflict Warning Dialog */}
+      <AlertDialog open={!!conflictWarning} onOpenChange={(open) => { if (!open) setConflictWarning(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Volunteer Already Assigned</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{conflictWarning?.volunteer.firstName} {conflictWarning?.volunteer.lastName}</strong> is already assigned to <strong>{conflictWarning?.conflictingRoleName}</strong> for this event. Do you still want to assign them to this role as well?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConflictWarning(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (conflictWarning) {
+                  try {
+                    await doAssignVolunteerToRole(conflictWarning.roleId, conflictWarning.volunteer);
+                  } catch {
+                    toast.error("Failed to update assignment.");
+                  } finally {
+                    setConflictWarning(null);
+                  }
+                }
+              }}
+            >
+              Assign Anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

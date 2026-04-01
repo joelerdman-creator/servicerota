@@ -3,13 +3,14 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useUser, useFirestore, useCollection, useDoc, WithId } from "@/firebase";
+import { useUser, useFirestore, useCollection, useDoc, WithId, useMemoFirebase as useMemoFB } from "@/firebase";
 import { useMemoFirebase } from "@/firebase/hooks/use-memo-firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
-import { collection, doc, query, where, updateDoc, getDocs } from "firebase/firestore";
+import { collection, doc, query, where, updateDoc, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { PageHeader } from "@/components/PageHeader";
 import { format, isFuture, parseISO } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -34,8 +35,10 @@ import {
 } from "@/components/ui/sheet";
 import toast from "react-hot-toast";
 import { FirestorePermissionError } from "@/firebase/errors";
-import { Check, Handshake, Loader2 } from "lucide-react";
+import { Check, Handshake, Loader2, ArrowLeftRight, CalendarDays, Copy } from "lucide-react";
 import { sendNotification } from "@/ai/flows/send-notification-flow";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 // --- TYPE DEFINITIONS ---
 
@@ -46,6 +49,13 @@ interface UserProfile {
   firstName?: string;
   lastName?: string;
   email?: string | null;
+  phone?: string;
+  smsOptIn?: boolean;
+  calendarToken?: string;
+}
+
+interface ChurchProfile {
+  name?: string;
 }
 
 interface Event {
@@ -83,6 +93,10 @@ export default function SchedulePage() {
   const [signupEvents, setSignupEvents] = useState<WithId<Event>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedEventForSignup, setSelectedEventForSignup] = useState<WithId<Event> | null>(null);
+  const [tradeAssignment, setTradeAssignment] = useState<FullAssignment | null>(null);
+  const [allPublishedEvents, setAllPublishedEvents] = useState<WithId<Event>[]>([]);
+  const [allAssignmentsForTrade, setAllAssignmentsForTrade] = useState<FullAssignment[]>([]);
+  const [isGeneratingToken, setIsGeneratingToken] = useState(false);
 
   // --- DATA FETCHING ---
   const userDocRef = useMemoFirebase(
@@ -90,6 +104,12 @@ export default function SchedulePage() {
     [user, firestore],
   );
   const { data: userProfile } = useDoc<UserProfile>(userDocRef);
+
+  const churchDocRef = useMemoFB(
+    () => userProfile?.churchId && firestore ? doc(firestore, "churches", userProfile.churchId) : null,
+    [userProfile?.churchId, firestore],
+  );
+  const { data: churchProfile } = useDoc<ChurchProfile>(churchDocRef);
 
   useEffect(() => {
     if (!userProfile?.churchId || !firestore || !user) {
@@ -194,12 +214,12 @@ export default function SchedulePage() {
     );
     const volunteersSnapshot = await getDocs(volunteersQuery);
     const qualifiedVolunteers = volunteersSnapshot.docs
-      .map(d => d.data() as UserProfile)
+      .map(d => ({ id: d.id, ...d.data() } as UserProfile & { id: string }))
       .filter(v => v.email && v.email !== user?.email); // Exclude self
   
     // 2. Mark role as pending substitution
     try {
-      await updateDoc(roleRef, { status: "Pending Substitution" });
+      await updateDoc(roleRef, { status: "Pending Substitution", originalVolunteerId: user!.uid });
       
       // 3. Send notifications
       const claimUrl = `${window.location.origin}/claim-substitution?churchId=${userProfile.churchId}&eventId=${assignment.event.id}&roleId=${assignment.role.id}`;
@@ -209,12 +229,14 @@ export default function SchedulePage() {
             await sendNotification({
                 type: "substitution_request",
                 toEmail: volunteer.email,
+                toPhone: volunteer.phone,
+                smsOptIn: volunteer.smsOptIn,
                 recipientName: volunteer.firstName,
                 requestingVolunteerName: userProfile.firstName,
                 eventName: assignment.event.eventName,
                 eventDate: assignment.event.eventDate,
                 roleName: assignment.role.roleName,
-                churchName: "Your Church", // Replace with actual church name if available
+                churchName: churchProfile?.name || "Your Church",
                 claimUrl: claimUrl
             });
         }
@@ -230,16 +252,81 @@ export default function SchedulePage() {
     }
   };
 
+  const calendarFeedUrl = userProfile?.calendarToken
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/api/calendar/volunteer/${userProfile.calendarToken}`
+    : null;
+
+  const webcalUrl = calendarFeedUrl?.replace(/^https?:\/\//, "webcal://");
+
+  const handleGenerateCalendarToken = async () => {
+    if (!user || !userDocRef) return;
+    setIsGeneratingToken(true);
+    try {
+      // Generate a random 32-byte hex token
+      const array = new Uint8Array(32);
+      crypto.getRandomValues(array);
+      const token = Array.from(array).map((b) => b.toString(16).padStart(2, "0")).join("");
+      await updateDoc(userDocRef, { calendarToken: token });
+      toast.success("Calendar link generated!");
+    } catch {
+      toast.error("Failed to generate calendar link.");
+    } finally {
+      setIsGeneratingToken(false);
+    }
+  };
+
+  const handleCopyCalendarUrl = () => {
+    if (!calendarFeedUrl) return;
+    navigator.clipboard.writeText(calendarFeedUrl);
+    toast.success("Link copied to clipboard!");
+  };
+
   return (
     <>
       <div className="flex flex-col items-center justify-start min-h-screen bg-background p-8">
         <div className="w-full max-w-4xl">
-          <header className="mb-8">
-            <h1 className="text-3xl font-bold">My Schedule</h1>
-            <p className="text-muted-foreground mt-2">
-              Here are your upcoming assignments. Thank you for serving!
-            </p>
-          </header>
+          <PageHeader
+            title="My Schedule"
+            description="Here are your upcoming assignments. Thank you for serving!"
+            backHref="/dashboard/volunteer"
+            backLabel="Dashboard"
+          />
+
+          {/* Calendar subscription */}
+          <Card className="mb-6 bg-muted/30">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <CalendarDays className="h-5 w-5 text-primary shrink-0 hidden sm:block" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">Subscribe to Your Schedule</p>
+                  {calendarFeedUrl ? (
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">{calendarFeedUrl}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Get your assignments in Google Calendar, Apple Calendar, or Outlook — automatically kept up to date.
+                    </p>
+                  )}
+                </div>
+                {calendarFeedUrl ? (
+                  <div className="flex gap-2 shrink-0">
+                    <Button size="sm" variant="outline" onClick={handleCopyCalendarUrl}>
+                      <Copy className="h-3.5 w-3.5 mr-1" /> Copy Link
+                    </Button>
+                    <Button size="sm" asChild>
+                      <a href={webcalUrl!}>
+                        <CalendarDays className="h-3.5 w-3.5 mr-1" /> Subscribe
+                      </a>
+                    </Button>
+                  </div>
+                ) : (
+                  <Button size="sm" onClick={handleGenerateCalendarToken} disabled={isGeneratingToken} className="shrink-0">
+                    {isGeneratingToken ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <CalendarDays className="h-3.5 w-3.5 mr-1" />}
+                    Generate Calendar Link
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-1 gap-8">
             <Card>
@@ -342,6 +429,16 @@ export default function SchedulePage() {
                                 </AlertDialogContent>
                                 </AlertDialog>
                              )}
+                             {assignment.role.assignedVolunteerId === user?.uid && assignment.role.status !== "Pending Substitution" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setTradeAssignment(assignment)}
+                                >
+                                  <ArrowLeftRight className="mr-2 h-4 w-4" />
+                                  Trade
+                                </Button>
+                             )}
                           </div>
                         </div>
                       ))}
@@ -351,10 +448,7 @@ export default function SchedulePage() {
             </Card>
           </div>
 
-          <footer className="mt-8 flex justify-center">
-            <Button asChild variant="link">
-              <Link href="/dashboard/volunteer">Back to Dashboard</Link>
-            </Button>
+          <footer className="mt-8">
           </footer>
         </div>
       </div>
@@ -365,6 +459,16 @@ export default function SchedulePage() {
           user={user}
           open={!!selectedEventForSignup}
           onOpenChange={(isOpen) => !isOpen && setSelectedEventForSignup(null)}
+        />
+      )}
+      {tradeAssignment && userProfile && (
+        <TradeRequestSheet
+          assignment={tradeAssignment}
+          userProfile={userProfile}
+          user={user}
+          churchName={churchProfile?.name || "Your Church"}
+          open={!!tradeAssignment}
+          onOpenChange={(isOpen) => !isOpen && setTradeAssignment(null)}
         />
       )}
     </>
@@ -488,6 +592,289 @@ function SignupSheet({ event, userProfile, user, open, onOpenChange }: SignupShe
             <SheetClose asChild>
                 <Button variant="outline">Close</Button>
             </SheetClose>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+
+// --- TRADE REQUEST SHEET ---
+
+interface OtherAssignment {
+  volunteerId: string;
+  volunteerName: string;
+  volunteerEmail: string | null;
+  phone?: string;
+  smsOptIn?: boolean;
+  roleId: string;
+  roleName: string;
+  eventId: string;
+  eventName: string;
+  eventDate: string;
+}
+
+interface TradeRequestSheetProps {
+  assignment: FullAssignment;
+  userProfile: UserProfile;
+  user: any;
+  churchName: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+function TradeRequestSheet({
+  assignment,
+  userProfile,
+  user,
+  churchName,
+  open,
+  onOpenChange,
+}: TradeRequestSheetProps) {
+  const firestore = useFirestore();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [otherAssignments, setOtherAssignments] = useState<OtherAssignment[]>([]);
+  const [selectedTradeTarget, setSelectedTradeTarget] = useState<string | null>(null);
+
+  // Fetch other volunteers' assignments from published events
+  useEffect(() => {
+    if (!open || !firestore || !userProfile?.churchId || !user) return;
+
+    const fetchOtherAssignments = async () => {
+      setIsLoading(true);
+      try {
+        // Get all future published events
+        const eventsQuery = query(
+          collection(firestore, `churches/${userProfile.churchId}/events`),
+          where("isPublished", "==", true),
+          where("eventDate", ">=", new Date().toISOString()),
+        );
+        const eventsSnap = await getDocs(eventsQuery);
+        const events = eventsSnap.docs.map(d => ({ id: d.id, ...d.data() } as WithId<Event>));
+
+        // Get family UIDs to exclude
+        const familyUids = new Set([user.uid]);
+        if (userProfile.familyId) {
+          const familyQuery = query(
+            collection(firestore, "users"),
+            where("familyId", "==", userProfile.familyId),
+          );
+          const familySnap = await getDocs(familyQuery);
+          familySnap.forEach(d => familyUids.add(d.id));
+        }
+
+        // Build a map of volunteer IDs to names/emails/phone
+        const volunteersSnap = await getDocs(
+          query(collection(firestore, "users"), where("churchId", "==", userProfile.churchId)),
+        );
+        const volunteerMap = new Map<string, { firstName: string; lastName: string; email: string | null; phone?: string; smsOptIn?: boolean }>();
+        volunteersSnap.forEach(d => {
+          const data = d.data() as any;
+          volunteerMap.set(d.id, {
+            firstName: data.firstName || "",
+            lastName: data.lastName || "",
+            email: data.email || null,
+            phone: data.phone,
+            smsOptIn: data.smsOptIn,
+          });
+        });
+
+        const results: OtherAssignment[] = [];
+
+        for (const event of events) {
+          const rolesSnap = await getDocs(
+            collection(firestore, `churches/${userProfile.churchId}/events/${event.id}/roles`),
+          );
+          rolesSnap.forEach(roleDoc => {
+            const role = roleDoc.data() as any;
+            // Only show roles assigned to OTHER volunteers (not self/family)
+            if (
+              role.assignedVolunteerId &&
+              !familyUids.has(role.assignedVolunteerId) &&
+              role.status === "Confirmed"
+            ) {
+              const vol = volunteerMap.get(role.assignedVolunteerId);
+              results.push({
+                volunteerId: role.assignedVolunteerId,
+                volunteerName: role.assignedVolunteerName || `${vol?.firstName} ${vol?.lastName}`,
+                volunteerEmail: vol?.email || null,
+                phone: vol?.phone,
+                smsOptIn: vol?.smsOptIn,
+                roleId: roleDoc.id,
+                roleName: role.roleName,
+                eventId: event.id,
+                eventName: event.eventName,
+                eventDate: event.eventDate,
+              });
+            }
+          });
+        }
+
+        // Sort by event date
+        results.sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+        setOtherAssignments(results);
+      } catch (e) {
+        console.error("Error fetching trade targets:", e);
+        toast.error("Could not load available trades.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOtherAssignments();
+  }, [open, firestore, userProfile, user]);
+
+  const handleProposeTrade = async () => {
+    if (!selectedTradeTarget || !firestore || !userProfile?.churchId || !user) return;
+
+    const target = otherAssignments.find(
+      a => `${a.eventId}__${a.roleId}` === selectedTradeTarget
+    );
+    if (!target) return;
+
+    setIsSubmitting(true);
+    const loadingToast = toast.loading("Sending trade request...");
+
+    try {
+      const tradeDoc = {
+        status: "pending",
+        requesterId: user.uid,
+        requesterName: `${userProfile.firstName} ${userProfile.lastName}`,
+        requesterRoleId: assignment.role.id,
+        requesterEventId: assignment.event.id,
+        requesterRoleName: assignment.role.roleName,
+        requesterEventName: assignment.event.eventName,
+        requesterEventDate: assignment.event.eventDate,
+        targetId: target.volunteerId,
+        targetName: target.volunteerName,
+        targetRoleId: target.roleId,
+        targetEventId: target.eventId,
+        targetRoleName: target.roleName,
+        targetEventName: target.eventName,
+        targetEventDate: target.eventDate,
+        churchId: userProfile.churchId,
+        createdAt: serverTimestamp(),
+      };
+
+      const docRef = await addDoc(
+        collection(firestore, `churches/${userProfile.churchId}/trade_requests`),
+        tradeDoc,
+      );
+
+      // Send email (+ optional SMS) to trade target
+      if (target.volunteerEmail) {
+        const acceptUrl = `${window.location.origin}/claim-trade?tradeId=${docRef.id}&churchId=${userProfile.churchId}`;
+        void sendNotification({
+          type: "trade_request",
+          toEmail: target.volunteerEmail,
+          toPhone: target.phone,
+          smsOptIn: target.smsOptIn,
+          recipientName: target.volunteerName.split(" ")[0],
+          requesterName: `${userProfile.firstName} ${userProfile.lastName}`,
+          requesterRoleName: assignment.role.roleName,
+          requesterEventName: assignment.event.eventName,
+          requesterEventDate: assignment.event.eventDate,
+          targetRoleName: target.roleName,
+          targetEventName: target.eventName,
+          targetEventDate: target.eventDate,
+          churchName,
+          acceptUrl,
+          churchId: userProfile.churchId,
+        });
+      }
+
+      toast.success("Trade request sent!", { id: loadingToast });
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to send trade request.", { id: loadingToast });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="sm:max-w-lg w-full flex flex-col">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <ArrowLeftRight className="h-5 w-5" />
+            Propose a Trade
+          </SheetTitle>
+          <SheetDescription>
+            You are offering your <strong>{assignment.role.roleName}</strong> role at{" "}
+            <strong>{assignment.event.eventName}</strong> on{" "}
+            {format(parseISO(assignment.event.eventDate), "MMM do")}.
+            <br />
+            Select another volunteer&apos;s assignment below to propose a swap.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="py-4 flex-grow overflow-y-auto">
+          {isLoading && (
+            <div className="text-center p-8">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+              <p className="text-sm text-muted-foreground mt-2">
+                Finding available trades...
+              </p>
+            </div>
+          )}
+          {!isLoading && otherAssignments.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">
+              No tradeable assignments found. Other volunteers must have confirmed assignments at
+              upcoming published events.
+            </p>
+          )}
+          {!isLoading && otherAssignments.length > 0 && (
+            <RadioGroup
+              value={selectedTradeTarget || ""}
+              onValueChange={setSelectedTradeTarget}
+              className="space-y-2"
+            >
+              {otherAssignments.map(a => {
+                const key = `${a.eventId}__${a.roleId}`;
+                return (
+                  <div
+                    key={key}
+                    className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                      selectedTradeTarget === key
+                        ? "border-primary bg-primary/5"
+                        : "hover:bg-muted/50"
+                    }`}
+                    onClick={() => setSelectedTradeTarget(key)}
+                  >
+                    <RadioGroupItem value={key} id={key} className="mt-1" />
+                    <Label htmlFor={key} className="flex-1 cursor-pointer font-normal">
+                      <p className="font-medium">{a.volunteerName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {a.roleName} — {a.eventName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(parseISO(a.eventDate), "EEEE, MMM do 'at' h:mm a")}
+                      </p>
+                    </Label>
+                  </div>
+                );
+              })}
+            </RadioGroup>
+          )}
+        </div>
+
+        <SheetFooter className="gap-2">
+          <SheetClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </SheetClose>
+          <Button
+            onClick={handleProposeTrade}
+            disabled={!selectedTradeTarget || isSubmitting}
+          >
+            {isSubmitting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <ArrowLeftRight className="mr-2 h-4 w-4" />
+            )}
+            Send Trade Request
+          </Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>

@@ -10,6 +10,16 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -32,7 +42,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2,
   Edit,
-  Repeat,
+  Trash2,
   PlusCircle,
 } from "lucide-react";
 import { format, add } from "date-fns";
@@ -49,6 +59,8 @@ import {
   limit,
   getDoc,
   setDoc,
+  deleteDoc,
+  arrayRemove,
 } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
 import { RRule } from "rrule";
@@ -81,8 +93,7 @@ export function RecurringSeriesManager({
   const [allSeries, setAllSeries] = useState<RecurringEventSeries[]>([]);
   const [seriesMetadataMap, setSeriesMetadataMap] = useState<Map<string, SeriesMetadata>>(new Map());
   const [isFetchingSeries, setIsFetchingSeries] = useState(false);
-  const [seriesToExtend, setSeriesToExtend] = useState<RecurringEventSeries | null>(null);
-  const [isAddingSeries, setIsAddingSeries] = useState(false);
+  const [isProcessingSeriesEdit, setIsProcessingSeriesEdit] = useState(false);
   const [newSeriesForm, setNewSeriesForm] = useState({
     name: "",
     templateId: "none",
@@ -90,12 +101,13 @@ export function RecurringSeriesManager({
     endDate: "",
     time: "10:00",
     isPublished: false,
-    isPerpetual: false,
   });
   const [editingSeries, setEditingSeries] = useState<RecurringEventSeries | null>(null);
   const [seriesEditName, setSeriesEditName] = useState("");
   const [seriesEditTemplate, setSeriesEditTemplate] = useState<string>("");
-  const [isProcessingSeriesEdit, setIsProcessingSeriesEdit] = useState(false);
+  const [seriesToDelete, setSeriesToDelete] = useState<RecurringEventSeries | null>(null);
+  const [futureEventCount, setFutureEventCount] = useState(0);
+  const [isDeletingSeries, setIsDeletingSeries] = useState(false);
 
   const fetchAllSeries = useCallback(async () => {
     if (!firestore || !userProfile?.churchId) return;
@@ -157,125 +169,117 @@ export function RecurringSeriesManager({
     }
   }, [editingSeries]);
 
-  const handleExtendSeries = async (series: RecurringEventSeries) => {
+  // --- DELETE SERIES (future events only) ---
+  const handlePrepareDeleteSeries = async (series: RecurringEventSeries) => {
     if (!firestore || !userProfile?.churchId) return;
-    setSeriesToExtend(series);
+    setSeriesToDelete(series);
 
-    const lastEventQuery = query(
+    // Count future events for the confirmation dialog
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const futureEventsQuery = query(
       collection(firestore, `churches/${userProfile.churchId}/events`),
       where("seriesId", "==", series.seriesId),
-      orderBy("eventDate", "desc"),
-      limit(1),
+      where("eventDate", ">=", today.toISOString()),
     );
-    const lastEventSnap = await getDocs(lastEventQuery);
-    if (lastEventSnap.empty) {
-      toast.error("Could not find the original event to extend.");
-      setSeriesToExtend(null);
-      return;
-    }
-    const lastEvent = lastEventSnap.docs[0].data();
-    const lastEventRolesSnap = await getDocs(collection(lastEventSnap.docs[0].ref, "roles"));
-    const rolesToCopy = lastEventRolesSnap.docs.map((d) => d.data());
-
-    const metadata = seriesMetadataMap.get(series.seriesId);
-    const isPerpetual = metadata?.isPerpetual;
-    let newDates: Date[] = [];
-
-    if (isPerpetual) {
-      const topUpUntil = add(new Date(), { years: 1 });
-      if (series.lastEventDate >= topUpUntil) {
-        toast("Series is already scheduled for at least a year out.");
-        setSeriesToExtend(null);
-        return;
-      }
-      let rule;
-      if (metadata?.rruleString) {
-        try {
-          const { rrulestr } = await import("rrule");
-          rule = rrulestr(metadata.rruleString);
-        } catch {
-          rule = new RRule({ freq: RRule.WEEKLY, dtstart: series.lastEventDate });
-        }
-      } else {
-        rule = new RRule({ freq: RRule.WEEKLY, dtstart: series.lastEventDate });
-      }
-      newDates = rule.between(add(series.lastEventDate, { days: 1 }), topUpUntil);
-    } else {
-      const rule = new RRule({
-        freq: RRule.WEEKLY,
-        dtstart: series.lastEventDate,
-        until: add(series.lastEventDate, { years: 1 }),
-      });
-      newDates = rule.all().slice(1);
-    }
-
-    if (newDates.length === 0) {
-      toast("No new occurrences to schedule.");
-      setSeriesToExtend(null);
-      return;
-    }
-
-    const batch = writeBatch(firestore);
-    const eventsCol = collection(firestore, `churches/${userProfile.churchId}/events`);
-
-    newDates.forEach((date) => {
-      const newEventRef = doc(eventsCol);
-      batch.set(newEventRef, { ...lastEvent, eventDate: date.toISOString(), isPublished: false });
-      rolesToCopy.forEach((role) => {
-        const newRoleRef = doc(collection(newEventRef, "roles"));
-        batch.set(newRoleRef, { eventId: newEventRef.id, roleName: role.roleName, status: "Pending" });
-      });
-    });
-
-    try {
-      await batch.commit();
-      toast.success(`Successfully extended "${series.eventName}" by ${newDates.length} event(s).`);
-      await fetchAllSeries();
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to extend event series.");
-    } finally {
-      setSeriesToExtend(null);
-    }
+    const futureEventsSnap = await getDocs(futureEventsQuery);
+    setFutureEventCount(futureEventsSnap.size);
   };
 
-  const handlePerpetualToggle = async (series: RecurringEventSeries, isPerpetualVal: boolean) => {
-    if (!firestore || !userProfile?.churchId) return;
-    const metadataRef = doc(firestore, `churches/${userProfile.churchId}/series_metadata`, series.seriesId);
+  const handleConfirmDeleteSeries = async () => {
+    if (!seriesToDelete || !firestore || !userProfile?.churchId) return;
+    setIsDeletingSeries(true);
+    const toastId = toast.loading(`Deleting future events for "${seriesToDelete.eventName}"...`);
+
     try {
-      const currentMetadata = seriesMetadataMap.get(series.seriesId);
-      const updateData: any = { seriesId: series.seriesId, isPerpetual: isPerpetualVal };
-      if (isPerpetualVal && !currentMetadata?.rruleString) {
-        const firstEventQuery = query(
-          collection(firestore, `churches/${userProfile.churchId}/events`),
-          where("seriesId", "==", series.seriesId),
-          orderBy("eventDate", "asc"),
-          limit(1),
-        );
-        const firstSnap = await getDocs(firstEventQuery);
-        if (!firstSnap.empty) {
-          const startDate = new Date(firstSnap.docs[0].data().eventDate);
-          const rule = new RRule({ freq: RRule.WEEKLY, dtstart: startDate });
-          updateData.rruleString = rule.toString();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // 1. Find all future events in this series
+      const futureEventsQuery = query(
+        collection(firestore, `churches/${userProfile.churchId}/events`),
+        where("seriesId", "==", seriesToDelete.seriesId),
+        where("eventDate", ">=", today.toISOString()),
+      );
+      const futureEventsSnap = await getDocs(futureEventsQuery);
+
+      // 2. Batch delete future events and their roles subcollections
+      // Firestore batch limit is 500 ops, so we may need multiple batches
+      let batch = writeBatch(firestore);
+      let opCount = 0;
+      const BATCH_LIMIT = 450; // leave some headroom
+
+      for (const eventDoc of futureEventsSnap.docs) {
+        // Delete roles subcollection docs
+        const rolesSnap = await getDocs(collection(eventDoc.ref, "roles"));
+        for (const roleDoc of rolesSnap.docs) {
+          batch.delete(roleDoc.ref);
+          opCount++;
+          if (opCount >= BATCH_LIMIT) {
+            await batch.commit();
+            batch = writeBatch(firestore);
+            opCount = 0;
+          }
+        }
+        // Delete event doc
+        batch.delete(eventDoc.ref);
+        opCount++;
+        if (opCount >= BATCH_LIMIT) {
+          await batch.commit();
+          batch = writeBatch(firestore);
+          opCount = 0;
         }
       }
-      await setDoc(metadataRef, updateData, { merge: true });
-      setSeriesMetadataMap((prev) => {
-        const newMap = new Map(prev);
-        newMap.set(series.seriesId, { ...currentMetadata, ...updateData });
-        return newMap;
-      });
-      toast.success(`Series set to ${isPerpetualVal ? "perpetual" : "manual"}.`);
-    } catch (e) {
-      console.error("Failed to update series metadata", e);
-      toast.error("Could not update series setting.");
+
+      // 3. Delete series_metadata doc
+      const metadataRef = doc(firestore, `churches/${userProfile.churchId}/series_metadata`, seriesToDelete.seriesId);
+      batch.delete(metadataRef);
+      opCount++;
+
+      // Commit remaining ops
+      if (opCount > 0) {
+        await batch.commit();
+      }
+
+      // 4. Clean up volunteer preferences (availableRecurringEventSeriesIds)
+      const volunteersQuery = query(
+        collection(firestore, `churches/${userProfile.churchId}/volunteers`),
+        where("availableRecurringEventSeriesIds", "array-contains", seriesToDelete.seriesId),
+      );
+      const volunteersSnap = await getDocs(volunteersQuery);
+
+      if (!volunteersSnap.empty) {
+        const volunteerBatch = writeBatch(firestore);
+        volunteersSnap.forEach((volunteerDoc) => {
+          volunteerBatch.update(volunteerDoc.ref, {
+            availableRecurringEventSeriesIds: arrayRemove(seriesToDelete!.seriesId),
+          });
+        });
+        await volunteerBatch.commit();
+      }
+
+      toast.success(
+        `Deleted ${futureEventsSnap.size} future event(s) for "${seriesToDelete.eventName}". Past events preserved.`,
+        { id: toastId }
+      );
+      setSeriesToDelete(null);
+      await fetchAllSeries();
+    } catch (e: any) {
+      console.error("Failed to delete series:", e);
+      toast.error(`Failed to delete series: ${e.message}`, { id: toastId });
       errorEmitter.emit(
         "permission-error",
-        new FirestorePermissionError({ path: metadataRef.path, operation: "write" }),
+        new FirestorePermissionError({
+          path: `churches/${userProfile.churchId}/events`,
+          operation: "delete",
+        }),
       );
+    } finally {
+      setIsDeletingSeries(false);
     }
   };
 
+  // --- RENAME SERIES ---
   const handleSeriesRename = async () => {
     if (!editingSeries || !seriesEditName.trim() || !userProfile?.churchId) {
       toast.error("Series name cannot be empty.");
@@ -303,6 +307,7 @@ export function RecurringSeriesManager({
     }
   };
 
+  // --- APPLY TEMPLATE ---
   const handleSeriesApplyTemplate = async () => {
     if (!editingSeries || !seriesEditTemplate || !userProfile?.churchId) {
       toast.error("Please select a template to apply.");
@@ -350,6 +355,7 @@ export function RecurringSeriesManager({
     }
   };
 
+  // --- CREATE NEW SERIES ---
   const handleCreateSeriesFromModal = async () => {
     if (!newSeriesForm.name.trim() || !newSeriesForm.startDate || !userProfile?.churchId) {
       toast.error("Please fill in the name and start date.");
@@ -375,7 +381,10 @@ export function RecurringSeriesManager({
       const eventsCol = collection(firestore, `churches/${userProfile.churchId}/events`);
       const metadataRef = doc(firestore, `churches/${userProfile.churchId}/series_metadata`, seriesId);
       const rule = new RRule({ freq: RRule.WEEKLY, dtstart: new Date(combinedStartDateTime) });
-      batch.set(metadataRef, { seriesId, isPerpetual: newSeriesForm.isPerpetual, rruleString: rule.toString() });
+
+      // Store endDate: null for ongoing series, or the end date string for finite series
+      const endDateValue = newSeriesForm.endDate ? newSeriesForm.endDate : null;
+      batch.set(metadataRef, { seriesId, endDate: endDateValue, rruleString: rule.toString() });
 
       const selectedTemplate = templates?.find((t) => t.id === newSeriesForm.templateId);
 
@@ -402,7 +411,7 @@ export function RecurringSeriesManager({
 
       await batch.commit();
       toast.success(`Successfully created "${newSeriesForm.name}" with ${dates.length} events.`, { id: loadingToast });
-      setNewSeriesForm({ name: "", templateId: "none", startDate: "", endDate: "", time: "10:00", isPublished: false, isPerpetual: false });
+      setNewSeriesForm({ name: "", templateId: "none", startDate: "", endDate: "", time: "10:00", isPublished: false });
       await fetchAllSeries();
     } catch (e: any) {
       toast.error(e.message || "Failed to create series.", { id: loadingToast });
@@ -418,10 +427,10 @@ export function RecurringSeriesManager({
           <DialogHeader>
             <DialogTitle>Manage Recurring Events</DialogTitle>
             <DialogDescription>
-              View all recurring event series in your church. Extend a series manually, or set it to &quot;Perpetual&quot; to have it top-up to one year of scheduled events.
+              View and manage your recurring event series. Series without an end date are automatically kept scheduled one year ahead.
             </DialogDescription>
           </DialogHeader>
-          <Tabs defaultValue="list" className="w-full" onValueChange={(val) => setIsAddingSeries(val === "new")}>
+          <Tabs defaultValue="list" className="w-full">
             <TabsList className="mb-4">
               <TabsTrigger value="list">Existing Series</TabsTrigger>
               <TabsTrigger value="new">Create New Series</TabsTrigger>
@@ -442,44 +451,39 @@ export function RecurringSeriesManager({
                           <TableHead>Series Name</TableHead>
                           <TableHead>Events</TableHead>
                           <TableHead>Last Date</TableHead>
-                          <TableHead>Perpetual</TableHead>
+                          <TableHead>Type</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {allSeries.map((series) => (
-                          <TableRow key={series.seriesId}>
-                            <TableCell className="font-semibold">{series.eventName}</TableCell>
-                            <TableCell>{series.eventCount}</TableCell>
-                            <TableCell>{format(series.lastEventDate, "PP")}</TableCell>
-                            <TableCell>
-                              <Switch
-                                checked={seriesMetadataMap.get(series.seriesId)?.isPerpetual || false}
-                                onCheckedChange={(checked) => handlePerpetualToggle(series, checked)}
-                                aria-label="Toggle perpetual status"
-                              />
-                            </TableCell>
-                            <TableCell className="text-right flex justify-end gap-2">
-                              <Button size="sm" variant="outline" onClick={() => setEditingSeries(series)}>
-                                <Edit className="h-4 w-4 mr-2" /> Edit
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => handleExtendSeries(series)}
-                                disabled={seriesToExtend?.seriesId === series.seriesId}
-                              >
-                                {seriesToExtend?.seriesId === series.seriesId ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <>
-                                    <Repeat className="h-4 w-4 mr-2" />
-                                    {seriesMetadataMap.get(series.seriesId)?.isPerpetual ? "Top Up" : "Extend"}
-                                  </>
-                                )}
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {allSeries.map((series) => {
+                          const metadata = seriesMetadataMap.get(series.seriesId);
+                          const isOngoing = !metadata?.endDate;
+                          return (
+                            <TableRow key={series.seriesId}>
+                              <TableCell className="font-semibold">{series.eventName}</TableCell>
+                              <TableCell>{series.eventCount}</TableCell>
+                              <TableCell>{format(series.lastEventDate, "PP")}</TableCell>
+                              <TableCell>
+                                <span className={`text-xs font-medium px-2 py-1 rounded-full ${isOngoing ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"}`}>
+                                  {isOngoing ? "Ongoing" : "Ends " + format(new Date(metadata!.endDate!), "PP")}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right flex justify-end gap-2">
+                                <Button size="sm" variant="outline" onClick={() => setEditingSeries(series)}>
+                                  <Edit className="h-4 w-4 mr-2" /> Edit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handlePrepareDeleteSeries(series)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
@@ -525,18 +529,12 @@ export function RecurringSeriesManager({
                   <div className="space-y-2">
                     <Label htmlFor="series-new-end">End Date (Optional)</Label>
                     <Input id="series-new-end" type="date" value={newSeriesForm.endDate} onChange={(e) => setNewSeriesForm({ ...newSeriesForm, endDate: e.target.value })} />
+                    <p className="text-xs text-muted-foreground">Leave blank for an ongoing series that&apos;s automatically maintained.</p>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="series-new-time">Time</Label>
                   <Input id="series-new-time" type="time" value={newSeriesForm.time} onChange={(e) => setNewSeriesForm({ ...newSeriesForm, time: e.target.value })} />
-                </div>
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">Perpetual Series</Label>
-                    <p className="text-sm text-muted-foreground">Automatically keep events scheduled for 1 year out.</p>
-                  </div>
-                  <Switch checked={newSeriesForm.isPerpetual} onCheckedChange={(checked) => setNewSeriesForm({ ...newSeriesForm, isPerpetual: checked })} />
                 </div>
                 <div className="flex items-center justify-between rounded-lg border p-4">
                   <div className="space-y-0.5">
@@ -606,6 +604,31 @@ export function RecurringSeriesManager({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Series Confirmation */}
+      <AlertDialog open={!!seriesToDelete} onOpenChange={(open) => !open && setSeriesToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &quot;{seriesToDelete?.eventName}&quot;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {futureEventCount} future event{futureEventCount !== 1 ? "s" : ""} and their
+              roles. Past events will be preserved for historical records. Volunteer preferences for this series will
+              also be cleaned up. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingSeries}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeleteSeries}
+              disabled={isDeletingSeries}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingSeries ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Delete Future Events
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

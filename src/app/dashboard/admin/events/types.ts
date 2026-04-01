@@ -67,8 +67,8 @@ export interface RecurringEventSeries {
 }
 
 export interface SeriesMetadata {
-  isPerpetual: boolean;
   rruleString?: string;
+  endDate?: string | null;  // null = indefinite, auto-maintained by cron
 }
 
 export interface MonthAnalysis {

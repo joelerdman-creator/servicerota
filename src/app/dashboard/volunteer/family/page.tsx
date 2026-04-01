@@ -32,6 +32,7 @@ import toast from "react-hot-toast";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Dialog,
   DialogContent,
@@ -176,12 +177,12 @@ export default function FamilyPage() {
     <>
       <div className="flex flex-col items-center justify-start min-h-screen bg-background p-8">
         <div className="w-full max-w-4xl">
-          <header className="mb-8">
-            <h1 className="text-3xl font-bold">Family Management</h1>
-            <p className="text-muted-foreground mt-2">
-              Manage your family&apos;s serving preferences and view members.
-            </p>
-          </header>
+          <PageHeader
+            title="Family Management"
+            description="Manage your family's serving preferences and view members."
+            backHref="/dashboard/volunteer"
+            backLabel="Dashboard"
+          />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
             <Card>
@@ -287,11 +288,6 @@ export default function FamilyPage() {
             </Card>
           </div>
 
-          <footer className="mt-8 flex justify-center">
-            <Button asChild variant="link">
-              <Link href="/dashboard/volunteer">Back to Dashboard</Link>
-            </Button>
-          </footer>
         </div>
       </div>
 

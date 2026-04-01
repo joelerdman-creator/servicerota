@@ -24,15 +24,24 @@ export async function POST(request: NextRequest) {
         for (const churchDoc of churchesSnap.docs) {
             const churchId = churchDoc.id;
             const seriesMetadataRef = adminFirestore.collection(`churches/${churchId}/series_metadata`);
-            const perpetualSeriesSnap = await seriesMetadataRef.where("isPerpetual", "==", true).get();
+            
+            // Query all series metadata — we'll filter for ongoing (no endDate) in code
+            // Firestore doesn't natively support "field is null OR field doesn't exist" in a single query
+            const allSeriesSnap = await seriesMetadataRef.get();
 
-            if (perpetualSeriesSnap.empty) {
+            if (allSeriesSnap.empty) {
                 continue;
             }
 
-            for (const seriesDoc of perpetualSeriesSnap.docs) {
+            for (const seriesDoc of allSeriesSnap.docs) {
                 const seriesId = seriesDoc.id;
                 const metadata = seriesDoc.data();
+
+                // Only auto-maintain series without an end date (ongoing/indefinite)
+                if (metadata.endDate) {
+                    continue;
+                }
+
                 const eventsCollectionRef = adminFirestore.collection(`churches/${churchId}/events`);
 
                 const lastEventQuery = eventsCollectionRef

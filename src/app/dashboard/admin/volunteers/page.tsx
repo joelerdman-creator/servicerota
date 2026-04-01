@@ -181,6 +181,20 @@ export default function VolunteersPage() {
     const docRef = doc(firestore, "users", volunteerId);
     try {
       await updateDoc(docRef, { status: "active" });
+      // Send approval confirmation email
+      const volunteer = allVolunteers.find(v => v.id === volunteerId);
+      if (volunteer?.email) {
+        void sendVolunteerInvite({
+          type: "approval_confirmation",
+          toEmail: volunteer.email,
+          toPhone: (volunteer as any).phone,
+          smsOptIn: (volunteer as any).smsOptIn,
+          volunteerName: `${volunteer.firstName} ${volunteer.lastName}`,
+          churchName: churchProfile?.name || "your church",
+          loginUrl: `${window.location.origin}/dashboard`,
+          churchId: adminProfile?.churchId,
+        });
+      }
       refresh();
       toast.success("Volunteer approved!");
     } catch (e) {

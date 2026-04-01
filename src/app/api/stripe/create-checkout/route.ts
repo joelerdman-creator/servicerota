@@ -1,0 +1,78 @@
+import { NextRequest, NextResponse } from "next/server";
+import { stripe, PLANS, PlanId } from "@/lib/stripe";
+
+/**
+ * POST /api/stripe/create-checkout
+ * Body: { planId: PlanId, interval: 'monthly' | 'annual' }
+ */
+export async function POST(request: NextRequest) {
+  // Dynamic import mirrors the pattern used by /api/auth/session
+  let adminAuth: any;
+  let firestore: any;
+  try {
+    const module = await import("@/firebase/admin-app");
+    adminAuth = module.auth;
+    firestore = module.firestore;
+  } catch {
+    return NextResponse.json({ error: "Server not configured" }, { status: 500 });
+  }
+
+  if (!adminAuth || !firestore) {
+    return NextResponse.json({ error: "Server not configured" }, { status: 500 });
+  }
+
+  // Verify Firebase auth token
+  const authHeader = request.headers.get("authorization");
+  const idToken = authHeader?.split("Bearer ")[1];
+  if (!idToken) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let uid: string;
+  try {
+    const decoded = await adminAuth.verifyIdToken(idToken);
+    uid = decoded.uid;
+  } catch (e: any) {
+    console.error("[create-checkout] verifyIdToken failed:", e?.message, "| token prefix:", idToken?.slice(0, 20));
+    return NextResponse.json({ error: "Invalid token", detail: e?.message }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const { planId, interval } = body as { planId: PlanId; interval: "monthly" | "annual" };
+
+  if (!planId || planId === "free" || !interval) {
+    return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+  }
+
+  const plan = PLANS[planId];
+  if (!("prices" in plan)) {
+    return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+  }
+
+  const userDoc = await firestore.collection("users").doc(uid).get();
+  const churchId: string = userDoc.data()?.churchId;
+  if (!churchId) {
+    return NextResponse.json({ error: "No church associated with account" }, { status: 400 });
+  }
+
+  const churchDoc = await firestore.collection("churches").doc(churchId).get();
+  const church = churchDoc.data() || {};
+
+  const baseUrl = request.headers.get("origin") || process.env.NEXT_PUBLIC_BASE_URL || "";
+  const priceId = plan.prices[interval];
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    payment_method_types: ["card"],
+    line_items: [{ price: priceId, quantity: 1 }],
+    allow_promotion_codes: true,
+    customer: church.stripeCustomerId || undefined,
+    customer_email: !church.stripeCustomerId ? (userDoc.data()?.email || undefined) : undefined,
+    metadata: { churchId },
+    subscription_data: { metadata: { churchId } },
+    success_url: `${baseUrl}/dashboard/admin/billing?success=true`,
+    cancel_url: `${baseUrl}/dashboard/admin/billing?canceled=true`,
+  });
+
+  return NextResponse.json({ url: session.url });
+}

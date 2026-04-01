@@ -38,8 +38,10 @@ service cloud.firestore {
 
     // --- CHURCH DATA & SUBCOLLECTIONS ---
     match /churches/{churchId} {
+      // Public get for widget/embed pages; subscription fields (planId, etc.) are non-sensitive
       allow get: if true;
       allow create: if isSuperUser() || (isSignedIn() && request.resource.data.ownerId == request.auth.uid);
+      // Only admins can update — protects planId, stripeCustomerId, etc. from client tampering
       allow update: if isSuperUser() || isChurchAdmin(churchId);
 
       // --- EVENTS ---
@@ -85,6 +87,13 @@ service cloud.firestore {
       
       match /series_metadata/{seriesId} {
         allow read, write: if isSuperUser() || isChurchAdmin(churchId);
+      }
+
+      // --- USAGE COUNTERS (SMS caps etc.) ---
+      // Written server-side only; admins can read for dashboard display
+      match /usage/{monthKey} {
+        allow read: if isChurchAdmin(churchId);
+        allow write: if false;
       }
 
       // --- NOTIFICATIONS ---

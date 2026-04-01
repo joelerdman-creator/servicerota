@@ -27,6 +27,7 @@ import toast from "react-hot-toast";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { collection, query, where } from "firebase/firestore";
 import Link from "next/link";
+import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { CalendarOff } from "lucide-react";
 
@@ -166,20 +167,19 @@ export default function AvailabilityPage() {
       <style>{css}</style>
       <div className="flex flex-col items-center justify-start min-h-screen bg-background p-8">
         <div className="w-full max-w-5xl">
-          <header className="mb-8">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-3xl font-bold">My Block-out Dates</h1>
-              {!isLoading && userProfile && (
-                <Badge variant="secondary" className="text-sm">
-                  <CalendarOff className="h-3.5 w-3.5 mr-1" />
-                  {userProfile.unavailability?.length || 0} date{(userProfile.unavailability?.length || 0) !== 1 ? "s" : ""} blocked
-                </Badge>
-              )}
-            </div>
-            <p className="text-muted-foreground mt-2">
-              Mark dates when you or your family are unavailable so you won&apos;t be scheduled on those days.
-            </p>
-          </header>
+          <PageHeader
+            title="My Block-out Dates"
+            description="Mark dates when you or your family are unavailable so you won't be scheduled on those days."
+            backHref="/dashboard/volunteer"
+            backLabel="Dashboard"
+          >
+            {!isLoading && userProfile && (
+              <Badge variant="secondary" className="text-sm">
+                <CalendarOff className="h-3.5 w-3.5 mr-1" />
+                {userProfile.unavailability?.length || 0} date{(userProfile.unavailability?.length || 0) !== 1 ? "s" : ""} blocked
+              </Badge>
+            )}
+          </PageHeader>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             {/* Calendar */}
@@ -278,11 +278,6 @@ export default function AvailabilityPage() {
             </Card>
           </div>
 
-          <footer className="mt-8 flex justify-center">
-            <Button asChild variant="link">
-              <Link href="/dashboard/volunteer">Back to Dashboard</Link>
-            </Button>
-          </footer>
         </div>
       </div>
     </>

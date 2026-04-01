@@ -1,206 +1,333 @@
-
 "use server";
 
 import type { AutoAssignInput, AssignmentPlan } from "./types";
 
-// The main exported function that calls the flow
 export async function autoAssignVolunteers(
   input: AutoAssignInput,
 ): Promise<AssignmentPlan> {
-  // Directly call the TypeScript implementation
   return deterministicAutoAssign(input);
 }
 
-// --- Deterministic Auto-Assign Implementation ---
+// ---------------------------------------------------------------------------
+// Deterministic Auto-Assign
+// ---------------------------------------------------------------------------
+//
+// Priority order when selecting a volunteer for a role:
+//   1. Hard constraints (blocks assignment entirely):
+//      a. Already assigned to this event in this run
+//      b. Does not hold the required role qualification
+//      c. Marked unavailable on the event date
+//      d. Has service-series preferences that exclude this series
+//      e. servingPreference = ONLY_WITH_FAMILY and no family member is
+//         scheduled at this event
+//
+//   2. Soft scoring (higher = higher priority):
+//      base = -assignmentCount * 10  +  daysSinceLastAssigned
+//           (never-assigned volunteers receive +365 bonus)
+//      family bonus: +50 if servingPreference = PREFER_FAMILY and a family
+//         member is already scheduled for this event
+//
+// Role ordering within an event:
+//   Roles are sorted by the number of qualified volunteers ASCENDING so the
+//   hardest-to-fill roles are attempted first (scarcity-first).
+//
+// Family tracking:
+//   familyAssignedToEvent tracks which familyIds have at least one member
+//   assigned to each event. It is seeded from pre-existing assignments and
+//   updated dynamically as this run assigns new volunteers.
+// ---------------------------------------------------------------------------
 
-export async function deterministicAutoAssign(input: AutoAssignInput): Promise<AssignmentPlan> {
-  // FIX: Ensure eventList is always an array, whether from a single event or a list.
-  const eventList = input.events ? input.events : (input.event ? [input.event] : []);
-  
-  const {
-    volunteers,
-    roleTemplates,
-  } = input;
-  // FIX: Always derive unassigned roles from the complete list inside the function
-  // to ensure roles that were manually unassigned are included.
+export async function deterministicAutoAssign(
+  input: AutoAssignInput,
+): Promise<AssignmentPlan> {
+  const eventList = input.events
+    ? input.events
+    : input.event
+    ? [input.event]
+    : [];
+
+  const { volunteers, roleTemplates } = input;
+
+  // All roles that still need filling
   const allUnassignedRoles = (input.allRoles || []).filter(
-      (r) => !r.assignedVolunteerId,
-    );
-
+    (r) => !r.assignedVolunteerId,
+  );
 
   const assignments: AssignmentPlan["assignments"] = [];
   const unassignedReasons: string[] = [];
-  type VolunteerType = (typeof volunteers)[number];
 
-  // Pre-process templates for quick lookup (Normalize names to lowercase for robust matching)
-  const roleTemplateMap = new Map(roleTemplates.map((rt) => [rt.name.trim().toLowerCase(), rt.id]));
-  
-  // Create a mutable map of user stats that we can update during the run
-  const userStats = new Map<string, { assignmentCount: number, lastAssigned?: string }>();
-  volunteers.forEach(v => {
-      userStats.set(v.id, {
-          assignmentCount: v.assignmentCount || 0,
-          lastAssigned: v.lastAssigned
-      });
+  // ----- Pre-computation helpers ------------------------------------------
+
+  // Role template lookup: normalized name → template id
+  const roleTemplateMap = new Map(
+    roleTemplates.map((rt) => [rt.name.trim().toLowerCase(), rt.id]),
+  );
+
+  // Family lookup: volunteerId → familyId
+  const volunteerFamilyMap = new Map<string, string>();
+  volunteers.forEach((v) => {
+    if (v.familyId) volunteerFamilyMap.set(v.id, v.familyId);
   });
 
-  const getFairnessScore = (volunteer: VolunteerType): number => {
-    const stats = userStats.get(volunteer.id);
-    if (!stats) return -Infinity; // Should not happen
+  // Track which family groups are represented at each event.
+  // Seeded from roles that were ALREADY assigned before this run.
+  const familyAssignedToEvent = new Map<string, Set<string>>();
+  (input.allRoles || [])
+    .filter((r) => r.assignedVolunteerId)
+    .forEach((r) => {
+      const fid = volunteerFamilyMap.get(r.assignedVolunteerId!);
+      if (fid) {
+        if (!familyAssignedToEvent.has(r.eventId)) {
+          familyAssignedToEvent.set(r.eventId, new Set());
+        }
+        familyAssignedToEvent.get(r.eventId)!.add(fid);
+      }
+    });
 
-    let score = 0;
-    score -= stats.assignmentCount * 10;
+  // Mutable stats updated as assignments are made (so later events use
+  // up-to-date fairness data).
+  const userStats = new Map<
+    string,
+    { assignmentCount: number; lastAssigned?: string }
+  >();
+  volunteers.forEach((v) => {
+    userStats.set(v.id, {
+      assignmentCount: v.assignmentCount || 0,
+      lastAssigned: v.lastAssigned,
+    });
+  });
+
+  // ----- Scoring -----------------------------------------------------------
+
+  const getBaseScore = (volunteerId: string): number => {
+    const stats = userStats.get(volunteerId);
+    if (!stats) return -Infinity;
+    let score = -(stats.assignmentCount * 10);
     if (stats.lastAssigned) {
-      const daysSinceAssigned =
-        (new Date().getTime() - new Date(stats.lastAssigned).getTime()) /
+      const daysSince =
+        (Date.now() - new Date(stats.lastAssigned).getTime()) /
         (1000 * 3600 * 24);
-      score += daysSinceAssigned;
+      score += daysSince;
     } else {
-      score += 365; // Give a large bonus to never-assigned volunteers
+      score += 365; // never-assigned bonus
     }
     return score;
   };
 
-  // Create a master volunteer list that can be sorted
-  const masterVolunteerList = [...volunteers];
-  
-  // Create a set of all role IDs that need assigning at the start.
-  // This helps us track which specific role instances are filled.
-  const unassignedRoleIds = new Set(allUnassignedRoles.map(r => r.id));
+  const getFairnessScore = (
+    volunteer: (typeof volunteers)[number],
+    eventId: string,
+  ): number => {
+    let score = getBaseScore(volunteer.id);
 
-  // Iterate over each event to be scheduled
-  for (const event of eventList) {
-    // Correctly filter for roles ONLY in the current event
-    const rolesForThisEvent = allUnassignedRoles.filter(
-      (role) => role.eventId === event.id,
-    );
-    
-    if (rolesForThisEvent.length === 0) {
-      continue; // No unassigned roles to fill for this event
+    // Family preference bonus
+    if (
+      volunteer.familyId &&
+      volunteer.servingPreference === "PREFER_FAMILY"
+    ) {
+      if (familyAssignedToEvent.get(eventId)?.has(volunteer.familyId)) {
+        score += 50;
+      }
     }
 
-    // Create a fresh, mutable pool of volunteers for THIS event's scheduling run
-    // And sort it based on the CURRENT fairness scores
-    const eventVolunteerPool = masterVolunteerList
-        .slice() // Create a copy
-        .sort((a, b) => getFairnessScore(b) - getFairnessScore(a));
+    return score;
+  };
 
-    const assignedVolunteerIdsThisEvent = new Set<string>();
-    const eventDateStr = new Date(event.eventDate).toISOString().split("T")[0];
+  // ----- Scarcity helper --------------------------------------------------
+
+  // Count volunteers eligible for a given role/event combination.
+  // Used to sort roles within an event so scarce roles are filled first.
+  const countEligible = (
+    roleName: string,
+    eventDateStr: string,
+    eventSeriesId: string | undefined,
+  ): number => {
+    const templateId = roleTemplateMap.get(roleName.trim().toLowerCase());
+    if (!templateId) return 0;
+    return volunteers.filter((v) => {
+      if (!v.availableRoleIds?.includes(templateId)) return false;
+      if (v.unavailability?.includes(eventDateStr)) return false;
+      if (
+        eventSeriesId &&
+        v.availableRecurringEventSeriesIds &&
+        v.availableRecurringEventSeriesIds.length > 0 &&
+        !v.availableRecurringEventSeriesIds.includes(eventSeriesId)
+      )
+        return false;
+      return true;
+    }).length;
+  };
+
+  // ----- Main loop --------------------------------------------------------
+
+  const unassignedRoleIds = new Set(allUnassignedRoles.map((r) => r.id));
+
+  for (const event of eventList) {
+    const eventDateStr = new Date(event.eventDate)
+      .toISOString()
+      .split("T")[0];
     const eventSeriesId = event.seriesId;
 
-    // Iterate through the roles for the current event
+    // Roles for this event that still need filling
+    const rolesForThisEvent = allUnassignedRoles.filter(
+      (r) => r.eventId === event.id && unassignedRoleIds.has(r.id),
+    );
+
+    if (rolesForThisEvent.length === 0) continue;
+
+    // Sort roles by scarcity: fewest qualified volunteers first.
+    // This ensures hard-to-fill roles are attempted before the volunteer
+    // pool is depleted by easier roles.
+    rolesForThisEvent.sort(
+      (a, b) =>
+        countEligible(a.roleName, eventDateStr, eventSeriesId) -
+        countEligible(b.roleName, eventDateStr, eventSeriesId),
+    );
+
+    // Fresh volunteer pool for this event, sorted by fairness score
+    const eventPool = [...volunteers].sort(
+      (a, b) =>
+        getFairnessScore(b, event.id) - getFairnessScore(a, event.id),
+    );
+
+    // Track who has been assigned in this event (one role per volunteer per event)
+    const assignedThisEvent = new Set<string>();
+
     for (const role of rolesForThisEvent) {
-       if (!unassignedRoleIds.has(role.id)) {
-        continue; // This specific role instance is already handled
-      }
-      
-      let roleFilled = false;
-      let failureReason = "No eligible volunteers found.";
-      
       const normalizedRoleName = role.roleName.trim().toLowerCase();
       const roleTemplateId = roleTemplateMap.get(normalizedRoleName);
 
       if (!roleTemplateId) {
-          unassignedReasons.push(`Role '${'\'\''}${role.roleName}' in event '${'\'\''}${event.eventName}' does not match any known Role Template. Please check spelling.`);
-          continue;
+        unassignedReasons.push(
+          `"${role.roleName}" at "${event.eventName}" — no matching role template (check spelling).`,
+        );
+        continue;
       }
 
-      // Find a suitable volunteer from the current event's pool
-      for (let i = 0; i < eventVolunteerPool.length; i++) {
-        const volunteer = eventVolunteerPool[i];
+      let filled = false;
+      // Track why the last candidate was rejected (for diagnostics)
+      let lastRejectReason =
+        "No volunteers are qualified for this role.";
 
-        // --- CHECK ELIGIBILITY ---
-        // A. Already assigned to this event in this run?
-        if (assignedVolunteerIdsThisEvent.has(volunteer.id)) {
+      for (let i = 0; i < eventPool.length; i++) {
+        const v = eventPool[i];
+
+        // A. Already assigned to this event
+        if (assignedThisEvent.has(v.id)) continue;
+
+        // B. Role qualification
+        if (!v.availableRoleIds?.includes(roleTemplateId)) {
+          lastRejectReason = "No available volunteers are qualified for this role.";
           continue;
         }
 
-        // B. Role compatibility
-        if (!volunteer.availableRoleIds?.includes(roleTemplateId)) {
+        // C. Unavailability
+        if (v.unavailability?.includes(eventDateStr)) {
+          lastRejectReason = "All qualified volunteers are unavailable on this date.";
           continue;
         }
 
-        // C. Service preference (NEW LOGIC)
-        // If an event is part of a series AND the volunteer has preferences, they must match.
-        if (eventSeriesId && volunteer.availableRecurringEventSeriesIds && volunteer.availableRecurringEventSeriesIds.length > 0) {
-            if (!volunteer.availableRecurringEventSeriesIds.includes(eventSeriesId)) {
-                failureReason = `${'\'\''}${volunteer.firstName} does not prefer this service time.`;
-                continue;
-            }
-        }
-
-
-        // D. Unavailability
-        if (volunteer.unavailability?.includes(eventDateStr)) {
+        // D. Service series preference
+        if (
+          eventSeriesId &&
+          v.availableRecurringEventSeriesIds &&
+          v.availableRecurringEventSeriesIds.length > 0 &&
+          !v.availableRecurringEventSeriesIds.includes(eventSeriesId)
+        ) {
+          lastRejectReason =
+            "All qualified volunteers prefer a different service time.";
           continue;
         }
-        
-        // --- ASSIGN VOLUNTEER ---
+
+        // E. Family constraint (hard block)
+        if (v.servingPreference === "ONLY_WITH_FAMILY") {
+          if (!v.familyId) {
+            // No family defined — treat as no constraint
+          } else if (
+            !familyAssignedToEvent.get(event.id)?.has(v.familyId)
+          ) {
+            lastRejectReason = `${v.firstName} only serves with family members, and none are scheduled for this event yet.`;
+            continue;
+          }
+        }
+
+        // ---- Assign ----
         assignments.push({
           roleId: role.id,
           eventId: event.id,
           roleName: role.roleName,
-          volunteerId: volunteer.id,
-          volunteerName: `${'\'\''}${volunteer.firstName} ${'\'\''}${volunteer.lastName}`,
+          volunteerId: v.id,
+          volunteerName: `${v.firstName} ${v.lastName}`,
         });
 
-        // Mark as assigned for THIS event
-        assignedVolunteerIdsThisEvent.add(volunteer.id);
-        
-        // Mark this specific role ID as filled
+        assignedThisEvent.add(v.id);
         unassignedRoleIds.delete(role.id);
 
-        // DYNAMICALLY UPDATE THE STATS for the next fairness score calculation
-        const currentStats = userStats.get(volunteer.id);
-        if (currentStats) {
-            currentStats.assignmentCount++;
-            currentStats.lastAssigned = new Date(event.eventDate).toISOString();
+        // Update family tracking so subsequent roles in this event can
+        // benefit from the PREFER_FAMILY / ONLY_WITH_FAMILY logic.
+        if (v.familyId) {
+          if (!familyAssignedToEvent.has(event.id)) {
+            familyAssignedToEvent.set(event.id, new Set());
+          }
+          familyAssignedToEvent.get(event.id)!.add(v.familyId);
         }
-        
-        // Remove from this event's pool so they can't be assigned to another role in the same event.
-        eventVolunteerPool.splice(i, 1);
-        roleFilled = true;
-        
-        // Break from the inner volunteer loop since we found someone for this role
-        break; 
+
+        // Update in-memory stats for future fairness scoring
+        const stats = userStats.get(v.id);
+        if (stats) {
+          stats.assignmentCount++;
+          stats.lastAssigned = new Date(event.eventDate).toISOString();
+        }
+
+        // Remove from pool so they can't fill a second role this event
+        eventPool.splice(i, 1);
+        filled = true;
+        break;
       }
-      if (!roleFilled) {
-        unassignedReasons.push(`Could not find a volunteer for ${'\'\''}${role.roleName} on ${'\'\''}${new Date(event.eventDate).toLocaleDateString()}. (Reason: ${'\'\''}${failureReason})`);
+
+      if (!filled) {
+        unassignedReasons.push(
+          `"${role.roleName}" at "${event.eventName}" on ${new Date(event.eventDate).toLocaleDateString()} — ${lastRejectReason}`,
+        );
       }
     }
   }
-  
-  // Construct the final user updates from our in-memory stats map
+
+  // ----- Build user update list -------------------------------------------
+
   const userUpdates: AssignmentPlan["userUpdates"] = [];
   userStats.forEach((stats, volunteerId) => {
-      const originalVolunteer = volunteers.find(v => v.id === volunteerId);
-      // Only include updates for users who were actually assigned something
-      if (originalVolunteer && (originalVolunteer.assignmentCount !== stats.assignmentCount || originalVolunteer.lastAssigned !== stats.lastAssigned)) {
-         userUpdates.push({
-            volunteerId,
-            newAssignmentCount: stats.assignmentCount,
-            newLastAssigned: stats.lastAssigned || new Date().toISOString(),
-         });
-      }
+    const original = volunteers.find((v) => v.id === volunteerId);
+    if (
+      original &&
+      (original.assignmentCount !== stats.assignmentCount ||
+        original.lastAssigned !== stats.lastAssigned)
+    ) {
+      userUpdates.push({
+        volunteerId,
+        newAssignmentCount: stats.assignmentCount,
+        newLastAssigned: stats.lastAssigned || new Date().toISOString(),
+      });
+    }
   });
 
-  let reasoning = `Deterministically assigned ${'\'\''}${
-      assignments.length
-    } out of ${'\'\''}${
-      (input.allRoles || []).filter(r => !r.assignedVolunteerId).length
-    } open roles based on fairness rules and volunteer constraints.`;
-    
+  // ----- Reasoning string -------------------------------------------------
+
+  const totalOpen = (input.allRoles || []).filter(
+    (r) => !r.assignedVolunteerId,
+  ).length;
+
+  let reasoning = `Assigned ${assignments.length} of ${totalOpen} open roles using fairness scoring (balances assignment count and time since last served).`;
+
   if (unassignedReasons.length > 0) {
-      reasoning += `\n\nUnfilled Roles:\n- ${'\'\''}${unassignedReasons.slice(0, 10).join('\n- ')}`;
-      if (unassignedReasons.length > 10) {
-          reasoning += `\n- ...and ${'\'\''}${unassignedReasons.length - 10} more.`
-      }
+    const shown = unassignedReasons.slice(0, 10);
+    reasoning +=
+      `\n\nUnfilled roles (${unassignedReasons.length}):\n• ` +
+      shown.join("\n• ");
+    if (unassignedReasons.length > 10) {
+      reasoning += `\n• …and ${unassignedReasons.length - 10} more.`;
+    }
   }
 
-  return {
-    assignments,
-    userUpdates,
-    reasoning,
-  };
+  return { assignments, userUpdates, reasoning };
 }

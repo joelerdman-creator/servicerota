@@ -42,6 +42,8 @@ export type ParsedServiceTemplate = z.infer<typeof ParsedServiceTemplateSchema>;
 // Individual Notification
 const BaseNotificationSchema = z.object({
   churchId: z.string().optional(), // Added for logging purposes
+  toPhone: z.string().optional(),  // Volunteer's phone number (E.164 format)
+  smsOptIn: z.boolean().optional(), // Whether the volunteer opted in to SMS
 });
 
 const AssignmentNotificationSchema = BaseNotificationSchema.extend({
@@ -75,10 +77,83 @@ const SubstitutionRequestSchema = BaseNotificationSchema.extend({
   claimUrl: z.string().url(),
 });
 
+const ApprovalConfirmationSchema = BaseNotificationSchema.extend({
+  type: z.literal("approval_confirmation"),
+  toEmail: z.string().email(),
+  volunteerName: z.string(),
+  churchName: z.string(),
+  loginUrl: z.string(),
+});
+
+const SubstitutionClaimedSchema = BaseNotificationSchema.extend({
+  type: z.literal("substitution_claimed"),
+  toEmail: z.string().email(),
+  originalVolunteerName: z.string(),
+  claimedByName: z.string(),
+  eventName: z.string(),
+  eventDate: z.string(),
+  roleName: z.string(),
+  churchName: z.string(),
+  loginUrl: z.string(),
+});
+
+const TradeRequestNotificationSchema = BaseNotificationSchema.extend({
+  type: z.literal("trade_request"),
+  toEmail: z.string().email(),
+  recipientName: z.string(),
+  requesterName: z.string(),
+  requesterRoleName: z.string(),
+  requesterEventName: z.string(),
+  requesterEventDate: z.string(),
+  targetRoleName: z.string(),
+  targetEventName: z.string(),
+  targetEventDate: z.string(),
+  churchName: z.string(),
+  acceptUrl: z.string(),
+});
+
+const TradeAcceptedNotificationSchema = BaseNotificationSchema.extend({
+  type: z.literal("trade_accepted"),
+  toEmail: z.string().email(),
+  requesterName: z.string(),
+  acceptedByName: z.string(),
+  newRoleName: z.string(),
+  newEventName: z.string(),
+  newEventDate: z.string(),
+  churchName: z.string(),
+  loginUrl: z.string(),
+});
+
+const AvailabilityReminderSchema = BaseNotificationSchema.extend({
+  type: z.literal("availability_reminder"),
+  toEmail: z.string().email(),
+  volunteerName: z.string(),
+  churchName: z.string(),
+  dueDate: z.string(), // human-readable date string e.g. "April 20, 2026"
+  loginUrl: z.string(),
+});
+
+const EventReminderSchema = BaseNotificationSchema.extend({
+  type: z.literal("event_reminder"),
+  toEmail: z.string().email(),
+  volunteerName: z.string(),
+  eventName: z.string(),
+  eventDate: z.string(),
+  roleName: z.string(),
+  churchName: z.string(),
+  loginUrl: z.string(),
+});
+
 export const SendNotificationInputSchema = z.discriminatedUnion("type", [
   AssignmentNotificationSchema,
   VolunteerInvitationSchema,
   SubstitutionRequestSchema,
+  ApprovalConfirmationSchema,
+  SubstitutionClaimedSchema,
+  TradeRequestNotificationSchema,
+  TradeAcceptedNotificationSchema,
+  AvailabilityReminderSchema,
+  EventReminderSchema,
 ]);
 export type SendNotificationInput = z.infer<typeof SendNotificationInputSchema>;
 
@@ -99,6 +174,8 @@ const AssignmentDetailsSchema = z.object({
 export const SendScheduleNotificationInputSchema = z.object({
   churchId: z.string().optional(),
   toEmail: z.string().email(),
+  toPhone: z.string().optional(),
+  smsOptIn: z.boolean().optional(),
   recipientName: z.string(),
   churchName: z.string(),
   eventName: z.string(),

@@ -51,7 +51,9 @@ import {
   Edit,
   Plus,
   Minus,
+  Bell,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -73,6 +75,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Image from "next/image";
+import { useSubscription } from "@/lib/hooks/use-subscription";
+import { UpgradeGate } from "@/components/UpgradeGate";
 
 
 const denominations = [
@@ -126,6 +130,13 @@ interface Church {
   secondaryColor?: string;
   accentColor?: string;
   fontFamily?: string;
+  availabilityReminder?: {
+    enabled: boolean;
+    recurrence: "monthly" | "quarterly";
+    dayOfMonth: number;
+    daysBeforeReminder: number;
+  };
+  eventReminderDays?: number[];
 }
 interface RoleTemplate {
   name: string;
@@ -147,6 +158,7 @@ interface ServiceTemplate {
 
 export default function SettingsPage() {
   const { user } = useUser();
+  const { canUse } = useSubscription();
   const firestore = useFirestore();
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -176,6 +188,15 @@ export default function SettingsPage() {
   const [editTemplateName, setEditTemplateName] = useState("");
   const [editTemplateRoles, setEditTemplateRoles] = useState<TemplateRole[]>([]);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Notification Settings State
+  const [availabilityReminderEnabled, setAvailabilityReminderEnabled] = useState(false);
+  const [availabilityReminderRecurrence, setAvailabilityReminderRecurrence] = useState<"monthly" | "quarterly">("monthly");
+  const [availabilityReminderDayOfMonth, setAvailabilityReminderDayOfMonth] = useState(20);
+  const [availabilityReminderDaysBefore, setAvailabilityReminderDaysBefore] = useState(7);
+  const [eventReminderEnabled, setEventReminderEnabled] = useState(false);
+  const [eventReminderDay1, setEventReminderDay1] = useState("3");
+  const [eventReminderDay2, setEventReminderDay2] = useState("");
 
   // State for Role Deletion/Editing
   const [roleToDelete, setRoleToDelete] = useState<WithId<RoleTemplate> | null>(null);
@@ -222,6 +243,16 @@ export default function SettingsPage() {
       setSecondaryColor(churchData.secondaryColor || "#64748b");
       setAccentColor(churchData.accentColor || "#f59e0b");
       setFontFamily(churchData.fontFamily || "Inter");
+      // Notifications
+      const ar = churchData.availabilityReminder;
+      setAvailabilityReminderEnabled(ar?.enabled ?? false);
+      setAvailabilityReminderRecurrence(ar?.recurrence ?? "monthly");
+      setAvailabilityReminderDayOfMonth(ar?.dayOfMonth ?? 20);
+      setAvailabilityReminderDaysBefore(ar?.daysBeforeReminder ?? 7);
+      const erd = churchData.eventReminderDays ?? [];
+      setEventReminderEnabled(erd.length > 0);
+      setEventReminderDay1(erd[0]?.toString() ?? "3");
+      setEventReminderDay2(erd[1]?.toString() ?? "");
     }
   }, [churchData]);
 
@@ -273,6 +304,12 @@ export default function SettingsPage() {
     setIsSaving(true);
     const toastId = toast.loading("Saving settings...");
 
+    const eventReminderDays: number[] = [];
+    const day1 = parseInt(eventReminderDay1);
+    const day2 = parseInt(eventReminderDay2);
+    if (eventReminderEnabled && !isNaN(day1) && day1 > 0) eventReminderDays.push(day1);
+    if (eventReminderEnabled && !isNaN(day2) && day2 > 0) eventReminderDays.push(day2);
+
     const updateData = {
       name,
       denomination,
@@ -283,6 +320,13 @@ export default function SettingsPage() {
       secondaryColor,
       accentColor,
       fontFamily,
+      availabilityReminder: {
+        enabled: availabilityReminderEnabled,
+        recurrence: availabilityReminderRecurrence,
+        dayOfMonth: availabilityReminderDayOfMonth,
+        daysBeforeReminder: availabilityReminderDaysBefore,
+      },
+      eventReminderDays,
     };
 
     try {
@@ -892,6 +936,147 @@ export default function SettingsPage() {
             </Tabs>
           </CardContent>
         </Card>
+
+        <UpgradeGate feature="Automated Reminders" locked={!canUse("availabilityReminders")}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell /> Notification Settings
+            </CardTitle>
+            <CardDescription>
+              Configure automated reminders for volunteers.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-8">
+            {/* Availability Reminder */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <p className="font-medium">Availability Reminders</p>
+                  <p className="text-sm text-muted-foreground">
+                    Automatically remind volunteers to submit their block-out dates before each scheduling period.
+                  </p>
+                </div>
+                <Switch
+                  checked={availabilityReminderEnabled}
+                  onCheckedChange={setAvailabilityReminderEnabled}
+                />
+              </div>
+              {availabilityReminderEnabled && (
+                <div className="pl-4 border-l-2 border-muted space-y-4">
+                  <div className="space-y-2">
+                    <Label>Scheduling Period</Label>
+                    <Select
+                      value={availabilityReminderRecurrence}
+                      onValueChange={(v) => setAvailabilityReminderRecurrence(v as "monthly" | "quarterly")}
+                    >
+                      <SelectTrigger className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="quarterly">Quarterly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      How often you build a new schedule.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="avail-day-of-month">Availability due by the</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="avail-day-of-month"
+                          type="number"
+                          min={1}
+                          max={28}
+                          value={availabilityReminderDayOfMonth}
+                          onChange={(e) => setAvailabilityReminderDayOfMonth(Math.min(28, Math.max(1, parseInt(e.target.value) || 1)))}
+                          className="w-20"
+                        />
+                        <span className="text-sm text-muted-foreground">of the month</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="avail-days-before">Send reminder</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="avail-days-before"
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={availabilityReminderDaysBefore}
+                          onChange={(e) => setAvailabilityReminderDaysBefore(Math.min(30, Math.max(1, parseInt(e.target.value) || 7)))}
+                          className="w-20"
+                        />
+                        <span className="text-sm text-muted-foreground">days before due date</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Pre-Event Reminders */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <p className="font-medium">Pre-Event Reminders</p>
+                  <p className="text-sm text-muted-foreground">
+                    Send volunteers a reminder email before the events they're assigned to. Volunteers can also set their own reminder preferences.
+                  </p>
+                </div>
+                <Switch
+                  checked={eventReminderEnabled}
+                  onCheckedChange={setEventReminderEnabled}
+                />
+              </div>
+              {eventReminderEnabled && (
+                <div className="pl-4 border-l-2 border-muted space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Configure up to 2 reminders. Leave the second blank for just one reminder.
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="reminder-day-1">First reminder</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="reminder-day-1"
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={eventReminderDay1}
+                          onChange={(e) => setEventReminderDay1(e.target.value)}
+                          className="w-20"
+                          placeholder="3"
+                        />
+                        <span className="text-sm text-muted-foreground">days before</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reminder-day-2">Second reminder (optional)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="reminder-day-2"
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={eventReminderDay2}
+                          onChange={(e) => setEventReminderDay2(e.target.value)}
+                          className="w-20"
+                          placeholder="—"
+                        />
+                        <span className="text-sm text-muted-foreground">days before</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        </UpgradeGate>
 
         <Card>
           <CardHeader>

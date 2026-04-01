@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, errorEmitter, WithId } from "@/firebase";
 import { doc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs, limit } from "firebase/firestore";
 import Link from "next/link";
+import { PageHeader } from "@/components/PageHeader";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -164,24 +165,23 @@ export default function VolunteerPreferencesPage() {
   return (
     <div className="flex flex-col items-center justify-start min-h-screen bg-background p-8">
       <div className="w-full max-w-2xl">
-        <header className="mb-8">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-3xl font-bold">My Preferences</h1>
-              {!isLoading && (
-                <Badge variant="secondary" className="text-sm">
-                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                  {selectedServices.size} service{selectedServices.size !== 1 ? "s" : ""} selected
-                </Badge>
-              )}
-            </div>
-            <p className="text-muted-foreground mt-2">
-                Manage your availability and tell your admin which roles you can serve in so they can schedule you appropriately.
-            </p>
-            <div className="flex items-start gap-2 mt-3 p-3 rounded-md bg-muted/50 border text-sm text-muted-foreground">
-              <Info className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>Your admin uses these preferences to automatically match you to roles you&apos;re qualified for at services you attend.</span>
-            </div>
-        </header>
+        <PageHeader
+          title="My Preferences"
+          description="Manage your availability and tell your admin which roles you can serve in so they can schedule you appropriately."
+          backHref="/dashboard/volunteer"
+          backLabel="Dashboard"
+        >
+          {!isLoading && (
+            <Badge variant="secondary" className="text-sm">
+              <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+              {selectedServices.size} service{selectedServices.size !== 1 ? "s" : ""} selected
+            </Badge>
+          )}
+        </PageHeader>
+        <div className="flex items-start gap-2 mb-6 p-3 rounded-md bg-muted/50 border text-sm text-muted-foreground">
+          <Info className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>Your admin uses these preferences to automatically match you to roles you&apos;re qualified for at services you attend.</span>
+        </div>
 
         <Card className="mb-8">
           <CardHeader>
@@ -249,11 +249,6 @@ export default function VolunteerPreferencesPage() {
                 </p>
             )}
           </CardContent>
-           <CardFooter>
-            <Button asChild variant="link">
-              <Link href="/dashboard/volunteer">Back to Dashboard</Link>
-            </Button>
-          </CardFooter>
         </Card>
       </div>
     </div>

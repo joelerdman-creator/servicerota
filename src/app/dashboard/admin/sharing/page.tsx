@@ -31,7 +31,11 @@ import {
   Church,
   Loader2,
   Bell,
+  CalendarDays,
+  ExternalLink,
 } from "lucide-react";
+import { useSubscription } from "@/lib/hooks/use-subscription";
+import { UpgradeGate } from "@/components/UpgradeGate";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
@@ -372,6 +376,7 @@ function NotificationsTab() {
 export default function SharingPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { canUse } = useSubscription();
 
   const previewWrapperRef = useRef<HTMLDivElement>(null);
   const [scaleFactor, setScaleFactor] = useState(1);
@@ -656,12 +661,13 @@ export default function SharingPage() {
       )}
       {!dataIsLoading && userProfile?.churchId && (
         <Tabs defaultValue="notifications">
-          <TabsList className="grid w-full grid-cols-5 max-w-3xl">
+          <TabsList className="grid w-full grid-cols-6 max-w-3xl">
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="bulletin">Bulletin</TabsTrigger>
             <TabsTrigger value="schedule">Schedule</TabsTrigger>
             <TabsTrigger value="widget">Web Widget</TabsTrigger>
             <TabsTrigger value="flyer">Flyer</TabsTrigger>
+            <TabsTrigger value="calendar">Calendar</TabsTrigger>
           </TabsList>
           <TabsContent value="notifications">
             <NotificationsTab />
@@ -746,6 +752,68 @@ export default function SharingPage() {
               </CardContent>
               <CardFooter><div className="w-full space-y-2"><Label htmlFor="embed-code">Embed Code</Label><div className="flex gap-2"><Input id="embed-code" readOnly value={widgetEmbedCode} className="font-mono" /><Button onClick={() => copyToClipboard(widgetEmbedCode)}><Copy className="mr-2 h-4 w-4" />Copy</Button></div></div></CardFooter>
             </Card>
+          </TabsContent>
+          <TabsContent value="calendar">
+            <UpgradeGate feature="Calendar Subscription Feeds" locked={!canUse("calendarFeeds")}>
+            <Card className="border-brand-accent/20">
+              <CardHeader>
+                <CardTitle>Calendar Subscription Feed</CardTitle>
+                <CardDescription>
+                  Subscribe to a live iCal feed of all published events. The feed includes every event with a full role roster — showing each assigned volunteer (or &ldquo;Open&rdquo; for unfilled roles). Works with Google Calendar, Apple Calendar, Outlook, and any app that supports webcal subscriptions.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label>Church Calendar Feed URL</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={baseUrl && userProfile?.churchId ? `${baseUrl}/api/calendar/church/${userProfile.churchId}` : "Loading…"}
+                      className="font-mono text-sm"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => copyToClipboard(`${baseUrl}/api/calendar/church/${userProfile?.churchId}`)}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    onClick={() => {
+                      const url = `${baseUrl}/api/calendar/church/${userProfile?.churchId}`;
+                      window.open(url.replace(/^https?:\/\//, "webcal://"), "_blank");
+                    }}
+                  >
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    Subscribe with Calendar App
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const url = encodeURIComponent(`${baseUrl}/api/calendar/church/${userProfile?.churchId}`);
+                      window.open(`https://calendar.google.com/calendar/r?cid=${url}`, "_blank");
+                    }}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Add to Google Calendar
+                  </Button>
+                </div>
+                <div className="rounded-md bg-muted/50 border p-4 text-sm text-muted-foreground space-y-1">
+                  <p className="font-medium text-foreground">What&apos;s included in the feed:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>All published events with date and time</li>
+                    <li>Full role roster for each event (e.g. &ldquo;Lector: Jane Smith&rdquo;)</li>
+                    <li>Open/unfilled roles marked as &ldquo;(Open)&rdquo;</li>
+                    <li>Roles with pending substitutions flagged with a warning</li>
+                  </ul>
+                  <p className="pt-2">The feed updates automatically — calendar apps typically refresh every 24 hours. Share this URL with staff or leadership who need visibility into the full schedule.</p>
+                </div>
+              </CardContent>
+            </Card>
+            </UpgradeGate>
           </TabsContent>
           <TabsContent value="flyer">
             <Card className="border-brand-accent/20">

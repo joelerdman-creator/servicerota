@@ -69,6 +69,8 @@ import {
 } from "@/components/ui/table";
 import { autoAssignVolunteers } from "@/lib/scheduling/auto-assign";
 import { sendScheduleNotification } from "@/ai/flows/send-notification-flow";
+import { useSubscription } from "@/lib/hooks/use-subscription";
+import { UpgradeGate } from "@/components/UpgradeGate";
 
 // --- Sub-components ---
 import { ImportEventsDialog } from "./ImportEventsDialog";
@@ -92,6 +94,7 @@ import type { AssignmentPlan, AutoAssignInput } from "@/lib/scheduling/types";
 
 export default function EventsPage() {
   const { user, isUserLoading } = useUser();
+  const { canUse } = useSubscription();
   const firestore = useFirestore();
 
   // --- Dialog visibility state (orchestrator) ---
@@ -302,7 +305,7 @@ export default function EventsPage() {
         ? publishMonthPlan.assignments.map((a) => ({ ...a }))
         : publishMonthStatus.roles.filter((r) => r.assignedVolunteerId);
 
-      const notifications = new Map<string, { recipientName: string; assignments: any[] }>();
+      const notifications = new Map<string, { recipientName: string; assignments: any[]; phone?: string; smsOptIn?: boolean }>();
       const volunteerMap = new Map(volunteers?.map((v) => [v.id, v]));
 
       for (const assignment of allAssignedRoles) {
@@ -315,7 +318,12 @@ export default function EventsPage() {
         const recipient = volunteerMap.get(recipientId);
         if (recipient?.email) {
           if (!notifications.has(recipient.email)) {
-            notifications.set(recipient.email, { recipientName: recipient.firstName, assignments: [] });
+            notifications.set(recipient.email, {
+              recipientName: recipient.firstName,
+              assignments: [],
+              phone: (recipient as any).phone,
+              smsOptIn: (recipient as any).smsOptIn,
+            });
           }
           const event = publishMonthStatus.events.find((e) => e.id === assignment.eventId);
           if (event) {
@@ -333,6 +341,8 @@ export default function EventsPage() {
         sendScheduleNotification({
           churchId: userProfile.churchId!,
           toEmail: email,
+          toPhone: data.phone,
+          smsOptIn: data.smsOptIn,
           recipientName: data.recipientName,
           churchName: churchProfile!.name,
           eventName: `the schedule for ${format(currentMonth, "MMMM")}`,
@@ -549,6 +559,7 @@ export default function EventsPage() {
             volunteersLoading={volunteersLoading}
             roleTemplates={roleTemplates ?? null}
             onOpenCreateTemplate={() => setIsCreateTemplateDialogOpen(true)}
+            churchName={churchProfile?.name}
           />
         </>
       )}
@@ -644,9 +655,11 @@ export default function EventsPage() {
                 <Button variant="ghost" onClick={resetPublishMonthDialog}>Cancel</Button>
                 <div className="flex gap-2">
                   <Button variant="secondary" onClick={() => handlePublishMonth(false)} disabled={!!publishMonthLoading}>Publish As-Is</Button>
-                  <Button onClick={handleAutoAssignMonth} disabled={!!publishMonthLoading || publishMonthStatus?.unfilledRoles.length === 0}>
-                    <Wand2 className="mr-2 h-4 w-4" /> Auto-Assign &amp; Publish
-                  </Button>
+                  <UpgradeGate feature="Auto-Assign" locked={!canUse("autoAssign")} inline>
+                    <Button onClick={handleAutoAssignMonth} disabled={!!publishMonthLoading || publishMonthStatus?.unfilledRoles.length === 0 || !canUse("autoAssign")}>
+                      <Wand2 className="mr-2 h-4 w-4" /> Auto-Assign &amp; Publish
+                    </Button>
+                  </UpgradeGate>
                 </div>
               </>
             )}

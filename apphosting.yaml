@@ -1,4 +1,7 @@
 env:
+  - variable: GOOGLE_GENAI_API_KEY
+    secret: GOOGLE_GENAI_API_KEY
+
   - variable: RESEND_API_KEY
     secret: RESEND_API_KEY
 

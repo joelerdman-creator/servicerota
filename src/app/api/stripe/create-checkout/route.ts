@@ -33,7 +33,6 @@ export async function POST(request: NextRequest) {
     const decoded = await adminAuth.verifyIdToken(idToken);
     uid = decoded.uid;
   } catch (e: any) {
-    console.error("[create-checkout] verifyIdToken failed:", e?.message, "| token prefix:", idToken?.slice(0, 20));
     return NextResponse.json({ error: "Invalid token", detail: e?.message }, { status: 401 });
   }
 

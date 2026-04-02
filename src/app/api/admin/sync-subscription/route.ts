@@ -31,15 +31,19 @@ export async function POST(request: NextRequest) {
     const priceId = subscription.items.data[0]?.price.id;
     const planId = planIdFromPriceId(priceId);
 
+    // current_period_end may be nested in billing_cycle_anchor on newer API versions
+    const periodEnd = (subscription as any).current_period_end ??
+      (subscription as any).items?.data?.[0]?.current_period_end ?? null;
+
     await firestore.collection("churches").doc(churchId).update({
       stripeCustomerId: subscription.customer as string,
       subscriptionId: subscription.id,
       subscriptionStatus: subscription.status,
       planId,
-      currentPeriodEnd: subscription.current_period_end,
+      ...(periodEnd !== null ? { currentPeriodEnd: periodEnd } : {}),
     });
 
-    return NextResponse.json({ success: true, planId, status: subscription.status });
+    return NextResponse.json({ success: true, planId, status: subscription.status, periodEnd, raw: JSON.stringify(subscription).slice(0, 500) });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message }, { status: 500 });
   }

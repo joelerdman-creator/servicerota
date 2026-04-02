@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stripe, PLANS, PlanId } from "@/lib/stripe";
+import { getStripe, PLANS, PlanId } from "@/lib/stripe";
 
 /**
  * POST /api/stripe/create-checkout
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   const baseUrl = request.headers.get("origin") || process.env.NEXT_PUBLIC_BASE_URL || "";
   const priceId = plan.prices[interval];
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     mode: "subscription",
     payment_method_types: ["card"],
     line_items: [{ price: priceId, quantity: 1 }],

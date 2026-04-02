@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 
 /**
  * POST /api/stripe/portal
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
   const baseUrl = request.headers.get("origin") || process.env.NEXT_PUBLIC_BASE_URL || "";
 
-  const session = await stripe.billingPortal.sessions.create({
+  const session = await getStripe().billingPortal.sessions.create({
     customer: stripeCustomerId,
     return_url: `${baseUrl}/dashboard/admin/billing`,
   });

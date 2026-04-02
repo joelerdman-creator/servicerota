@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stripe, planIdFromPriceId } from "@/lib/stripe";
+import { getStripe, planIdFromPriceId } from "@/lib/stripe";
 import { firestore } from "@/firebase/admin-app";
 import Stripe from "stripe";
 
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    event = getStripe().webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err: any) {
     console.error("Stripe webhook signature verification failed:", err.message);
     return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         const churchId = session.metadata?.churchId;
         if (!churchId || !session.customer || !session.subscription) break;
 
-        const subscription = await stripe.subscriptions.retrieve(
+        const subscription = await getStripe().subscriptions.retrieve(
           session.subscription as string,
         );
         const priceId = subscription.items.data[0]?.price.id;

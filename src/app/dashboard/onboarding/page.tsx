@@ -351,8 +351,8 @@ export default function OnboardingWizardPage() {
         toast.dismiss(toastId);
         return;
       }
-      const funnyError = "Uh oh, looks like Betty forgot her potluck dish again. Please try another file.";
-      toast.error(funnyError, { id: toastId, duration: 6000 });
+      const detail = error?.message ? `: ${error.message}` : "";
+      toast.error(`Extraction failed${detail}`, { id: toastId, duration: 8000 });
     }
   };
 

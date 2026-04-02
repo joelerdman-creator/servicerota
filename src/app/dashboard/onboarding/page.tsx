@@ -15,8 +15,6 @@ import { Stepper, StepperItem, useExternalStepper } from "@/components/ui/steppe
 import { Loader2, Check } from "lucide-react";
 import toast from "react-hot-toast";
 import { extractDataFromText } from "@/ai/flows/extract-data-flow";
-import { extractDataFromDocument } from "@/ai/flows/extract-from-document-flow";
-import { extractDataFromEml } from "@/ai/flows/extract-from-eml-flow";
 import { useRouter } from "next/navigation";
 import type { ParsedEvent, Volunteer, Role, DocumentExtractionOutput, ParsedServiceTemplate } from "@/ai/flows/types";
 import { uniq, uniqBy } from "lodash";
@@ -321,18 +319,26 @@ export default function OnboardingWizardPage() {
         ...extractedData.roles.map(r => r.name),
       ];
 
-      let output: DocumentExtractionOutput;
-      const input = { documentDataUri: dataUri, knownRoleNames };
+      const endpoint = uploadedFile.name.endsWith(".eml")
+        ? "/api/extract/eml"
+        : "/api/extract/document";
 
-      if (uploadedFile.name.endsWith(".eml")) {
-        output = await extractDataFromEml(input);
-      } else {
-        output = await extractDataFromDocument(input);
-      }
-      
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentDataUri: dataUri, knownRoleNames }),
+      });
+
+      const output: DocumentExtractionOutput & { error?: string } = await res.json();
+
       clearInterval(intervalId);
       if (!isComponentMounted) {
         toast.dismiss(toastId);
+        return;
+      }
+
+      if (!res.ok || output.error) {
+        toast.error(`Extraction failed: ${output.error || res.statusText}`, { id: toastId, duration: 8000 });
         return;
       }
 
@@ -341,9 +347,7 @@ export default function OnboardingWizardPage() {
       const futureEvents = output.events?.filter(event => new Date(event.eventDate) >= now) || [];
 
       toast.success(output.reasoning || "Successfully extracted data.", { id: toastId, duration: 4000 });
-      
       mergeExtractedData({ ...output, events: futureEvents });
-
       stepper.nextStep();
     } catch (error: any) {
       clearInterval(intervalId);
@@ -351,8 +355,7 @@ export default function OnboardingWizardPage() {
         toast.dismiss(toastId);
         return;
       }
-      const detail = error?.message ? `: ${error.message}` : "";
-      toast.error(`Extraction failed${detail}`, { id: toastId, duration: 8000 });
+      toast.error(`Extraction failed: ${error?.message || "Unknown error"}`, { id: toastId, duration: 8000 });
     }
   };
 

@@ -36,3 +36,11 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# logs and temp files
+*.log
+*.tmp
+$logFile
+
+# claude code
+.claude/

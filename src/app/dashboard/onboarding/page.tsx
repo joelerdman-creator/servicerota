@@ -81,9 +81,9 @@ type DeletedItem = {
 
 const steps = [
   { label: "Welcome" },
+  { label: "Upload Schedule" },
   { label: "Define Roles" },
   { label: "Recurring Services" },
-  { label: "Upload Schedule" },
   { label: "Review & Confirm" },
   { label: "All Set!" },
 ];
@@ -316,7 +316,10 @@ export default function OnboardingWizardPage() {
 
     try {
       const dataUri = await fileToDataUri(uploadedFile);
-      const knownRoleNames = existingRoles?.map(role => role.name) || [];
+      const knownRoleNames = [
+        ...(existingRoles?.map(r => r.name) || []),
+        ...extractedData.roles.map(r => r.name),
+      ];
 
       let output: DocumentExtractionOutput;
       const input = { documentDataUri: dataUri, knownRoleNames };
@@ -538,11 +541,11 @@ export default function OnboardingWizardPage() {
       case 0:
         return <WelcomeStep churchProfile={churchProfile} onSave={handleSaveChurchInfo} />;
       case 1:
-        return <DefineRolesStep onSave={handleDefineRolesAndVolunteers} denomination={churchProfile?.denomination} />;
-      case 2:
-        return <RecurringServicesStep availableRoles={extractedData.roles} onSave={handleCreateRecurringServices} />;
-      case 3:
         return <UploadScheduleStep onExtract={handleExtractFromFile} />;
+      case 2:
+        return <DefineRolesStep onSave={handleDefineRolesAndVolunteers} denomination={churchProfile?.denomination} />;
+      case 3:
+        return <RecurringServicesStep availableRoles={extractedData.roles} onSave={handleCreateRecurringServices} />;
       case 4:
         return <ReviewStep extractedData={extractedData} setExtractedData={setExtractedData} onRemoveItem={removeItem} />;
       case 5:

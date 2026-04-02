@@ -262,7 +262,7 @@ export const DefineRolesStep: FC<{
     return (
         <div className="max-w-3xl mx-auto space-y-6 py-6">
             <div>
-                <h3 className="font-semibold text-lg flex items-center gap-2"><UserPlus /> Step 2: Define Roles & Volunteers</h3>
+                <h3 className="font-semibold text-lg flex items-center gap-2"><UserPlus /> Step 3: Define Roles & Volunteers</h3>
                 <p className="text-sm text-muted-foreground mt-1">Select from suggested roles, add your own, or import a list of volunteers.</p>
             </div>
 
@@ -384,7 +384,7 @@ export const RecurringServicesStep: FC<{
     return (
         <div className="max-w-2xl mx-auto space-y-4 py-6">
             <div>
-                <h3 className="font-semibold text-lg flex items-center gap-2"><Repeat /> Step 3: Recurring Services</h3>
+                <h3 className="font-semibold text-lg flex items-center gap-2"><Repeat /> Step 4: Recurring Services</h3>
                 <p className="text-sm text-muted-foreground mt-1">Define your weekly recurring services and the roles needed for each. You can add one-off events and special services later.</p>
             </div>
             
@@ -465,7 +465,7 @@ export const UploadScheduleStep: FC<{ onExtract: (file: File) => void }> = ({ on
 
   return (
     <div className="max-w-xl mx-auto space-y-4 py-6">
-      <div><h3 className="font-semibold text-lg flex items-center gap-2"><FileUp /> Step 4: Upload a Schedule (Optional)</h3><p className="text-sm text-muted-foreground mt-1">Upload a schedule (PDF, image, .eml) to extract events and roles. This is good for one-off or special events not covered by your weekly schedule.</p></div>
+      <div><h3 className="font-semibold text-lg flex items-center gap-2"><FileUp /> Step 2: Upload a Schedule (Optional)</h3><p className="text-sm text-muted-foreground mt-1">Upload an existing schedule (PDF, image, .eml) and the AI will extract your volunteers, roles, and events automatically. Skip this step if you'd prefer to enter everything manually.</p></div>
       <div className="space-y-2"><Label htmlFor="file-upload">Schedule Document</Label><Input id="file-upload" type="file" onChange={(e) => e.target.files && setUploadedFile(e.target.files[0])} accept=".pdf,.png,.jpg,.jpeg,.eml" /></div>
       <Button onClick={handleExtract} disabled={isExtracting || !uploadedFile} className="w-full">
         {isExtracting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />} Upload & Add to Review
@@ -590,7 +590,7 @@ export const ReviewStep: FC<ReviewStepProps> = ({ extractedData, setExtractedDat
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="font-semibold text-lg">Step 5: Review Extracted Data</h3>
+        <h3 className="font-semibold text-lg">Step 5: Review & Confirm</h3>
         <p className="text-muted-foreground text-sm">Please check the data in each tab below. You can merge duplicates, edit names, and adjust quantities.</p>
       </div>
 

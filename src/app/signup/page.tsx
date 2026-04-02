@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/firebase";
-import { createUserWithEmailAndPassword, updateProfile, UserCredential } from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, UserCredential } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import GoogleIcon from "@/components/icons/google";
 import toast from "react-hot-toast";
 
 export default function SignUpPage() {
@@ -26,6 +27,7 @@ export default function SignUpPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const auth = useAuth();
   const router = useRouter();
 
@@ -37,6 +39,23 @@ export default function SignUpPage() {
       body: JSON.stringify({ idToken }),
     });
     router.push("/dashboard");
+  };
+
+  const handleGoogleSignUp = async () => {
+    if (!auth) { toast.error("Auth service not available."); return; }
+    setIsGoogleLoading(true);
+    setError(null);
+    const provider = new GoogleAuthProvider();
+    try {
+      const userCredential = await signInWithPopup(auth, provider);
+      await handleSessionLogin(userCredential);
+      toast.success("Account created with Google!");
+    } catch (err: any) {
+      setError(err.message);
+      toast.error(err.message);
+    } finally {
+      setIsGoogleLoading(false);
+    }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -77,6 +96,27 @@ export default function SignUpPage() {
           <CardDescription>Get started with Parish Scribe for free</CardDescription>
         </CardHeader>
         <CardContent>
+          <Button
+            variant="outline"
+            className="w-full mb-4"
+            onClick={handleGoogleSignUp}
+            disabled={isLoading || isGoogleLoading}
+          >
+            {isGoogleLoading ? (
+              <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <GoogleIcon className="mr-2 h-4 w-4" />
+            )}
+            Sign up with Google
+          </Button>
+          <div className="relative mb-4">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">Or sign up with email</span>
+            </div>
+          </div>
           <form onSubmit={handleSignUp} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

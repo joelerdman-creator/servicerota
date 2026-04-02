@@ -12,8 +12,36 @@ const fontSans = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Parish Scribe",
-  description: "SaaS platform for church volunteer management.",
+  title: {
+    default: "Parish Scribe — Church Volunteer Scheduling Software",
+    template: "%s | Parish Scribe",
+  },
+  description:
+    "Parish Scribe automates volunteer scheduling for churches. AI-powered rota builder, automated email & SMS reminders, substitution requests, and calendar feeds. Free plan available.",
+  keywords: [
+    "church volunteer scheduling",
+    "church rota software",
+    "volunteer management church",
+    "parish scheduling app",
+    "liturgical volunteer scheduler",
+    "church volunteer coordinator",
+    "automated church rota",
+  ],
+  openGraph: {
+    type: "website",
+    siteName: "Parish Scribe",
+    title: "Parish Scribe — Church Volunteer Scheduling Software",
+    description:
+      "Automate your church volunteer rota. AI scheduling, email & SMS reminders, and a self-service portal your volunteers will love.",
+    url: "https://parishscribe.com",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Parish Scribe — Church Volunteer Scheduling Software",
+    description:
+      "Automate your church volunteer rota. AI scheduling, email & SMS reminders, and a self-service portal your volunteers will love.",
+  },
+  metadataBase: new URL("https://parishscribe.com"),
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

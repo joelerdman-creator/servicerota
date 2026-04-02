@@ -3,6 +3,10 @@
  * No Stripe SDK dependency here.
  */
 
+function env(key: string): string {
+  return (process.env[key] ?? "").trim();
+}
+
 export const PLANS = {
   free: {
     id: "free",
@@ -24,8 +28,8 @@ export const PLANS = {
     volunteerLimit: 150,
     smsMonthlyLimit: 500,
     prices: {
-      monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY,
-      annual: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_ANNUAL,
+      monthly: env("NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY"),
+      annual: env("NEXT_PUBLIC_STRIPE_PRICE_PRO_ANNUAL"),
     },
     features: {
       autoAssign: true,
@@ -42,8 +46,8 @@ export const PLANS = {
     volunteerLimit: 500,
     smsMonthlyLimit: 1500,
     prices: {
-      monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_GROWTH_MONTHLY,
-      annual: process.env.NEXT_PUBLIC_STRIPE_PRICE_GROWTH_ANNUAL,
+      monthly: env("NEXT_PUBLIC_STRIPE_PRICE_GROWTH_MONTHLY"),
+      annual: env("NEXT_PUBLIC_STRIPE_PRICE_GROWTH_ANNUAL"),
     },
     features: {
       autoAssign: true,
@@ -60,8 +64,8 @@ export const PLANS = {
     volunteerLimit: -1,
     smsMonthlyLimit: -1,
     prices: {
-      monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_MULTISITE_MONTHLY,
-      annual: process.env.NEXT_PUBLIC_STRIPE_PRICE_MULTISITE_ANNUAL,
+      monthly: env("NEXT_PUBLIC_STRIPE_PRICE_MULTISITE_MONTHLY"),
+      annual: env("NEXT_PUBLIC_STRIPE_PRICE_MULTISITE_ANNUAL"),
     },
     features: {
       autoAssign: true,
@@ -78,10 +82,11 @@ export type PlanId = keyof typeof PLANS;
 
 /** Resolve a Stripe price ID back to a plan ID (server-side use) */
 export function planIdFromPriceId(priceId: string): PlanId {
+  const trimmed = priceId.trim();
   for (const [key, plan] of Object.entries(PLANS)) {
     if (key === "free") continue;
     const p = plan as { prices: { monthly?: string; annual?: string } };
-    if (p.prices.monthly === priceId || p.prices.annual === priceId) {
+    if (p.prices.monthly === trimmed || p.prices.annual === trimmed) {
       return key as PlanId;
     }
   }

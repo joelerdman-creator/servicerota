@@ -13,12 +13,12 @@ export async function POST(request: NextRequest) {
     const module = await import("@/firebase/admin-app");
     adminAuth = module.auth;
     firestore = module.firestore;
-  } catch {
-    return NextResponse.json({ error: "Server not configured" }, { status: 500 });
+  } catch (e: any) {
+    return NextResponse.json({ error: "Server not configured", detail: e?.message }, { status: 500 });
   }
 
   if (!adminAuth || !firestore) {
-    return NextResponse.json({ error: "Server not configured" }, { status: 500 });
+    return NextResponse.json({ error: "Server not configured", detail: "adminAuth or firestore is null" }, { status: 500 });
   }
 
   // Verify Firebase auth token
@@ -48,30 +48,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 
-  const userDoc = await firestore.collection("users").doc(uid).get();
-  const churchId: string = userDoc.data()?.churchId;
-  if (!churchId) {
-    return NextResponse.json({ error: "No church associated with account" }, { status: 400 });
+  try {
+    const userDoc = await firestore.collection("users").doc(uid).get();
+    const churchId: string = userDoc.data()?.churchId;
+    if (!churchId) {
+      return NextResponse.json({ error: "No church associated with account" }, { status: 400 });
+    }
+
+    const churchDoc = await firestore.collection("churches").doc(churchId).get();
+    const church = churchDoc.data() || {};
+
+    const baseUrl = request.headers.get("origin") || process.env.NEXT_PUBLIC_BASE_URL || "";
+    const priceId = plan.prices[interval];
+
+    const session = await getStripe().checkout.sessions.create({
+      mode: "subscription",
+      payment_method_types: ["card"],
+      line_items: [{ price: priceId, quantity: 1 }],
+      allow_promotion_codes: true,
+      customer: church.stripeCustomerId || undefined,
+      customer_email: !church.stripeCustomerId ? (userDoc.data()?.email || undefined) : undefined,
+      metadata: { churchId },
+      subscription_data: { metadata: { churchId } },
+      success_url: `${baseUrl}/dashboard/admin/billing?success=true`,
+      cancel_url: `${baseUrl}/dashboard/admin/billing?canceled=true`,
+    });
+
+    return NextResponse.json({ url: session.url });
+  } catch (e: any) {
+    console.error("[create-checkout] error:", e?.message);
+    return NextResponse.json({ error: "Checkout failed", detail: e?.message }, { status: 500 });
   }
-
-  const churchDoc = await firestore.collection("churches").doc(churchId).get();
-  const church = churchDoc.data() || {};
-
-  const baseUrl = request.headers.get("origin") || process.env.NEXT_PUBLIC_BASE_URL || "";
-  const priceId = plan.prices[interval];
-
-  const session = await getStripe().checkout.sessions.create({
-    mode: "subscription",
-    payment_method_types: ["card"],
-    line_items: [{ price: priceId, quantity: 1 }],
-    allow_promotion_codes: true,
-    customer: church.stripeCustomerId || undefined,
-    customer_email: !church.stripeCustomerId ? (userDoc.data()?.email || undefined) : undefined,
-    metadata: { churchId },
-    subscription_data: { metadata: { churchId } },
-    success_url: `${baseUrl}/dashboard/admin/billing?success=true`,
-    cancel_url: `${baseUrl}/dashboard/admin/billing?canceled=true`,
-  });
-
-  return NextResponse.json({ url: session.url });
 }

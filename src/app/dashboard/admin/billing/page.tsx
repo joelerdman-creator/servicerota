@@ -104,9 +104,9 @@ export default function BillingPage() {
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
-      else toast.error(data.error || "Could not start checkout.");
-    } catch {
-      toast.error("Something went wrong. Please try again.");
+      else toast.error(data.detail || data.error || "Could not start checkout.");
+    } catch (e: any) {
+      toast.error(e?.message || "Something went wrong. Please try again.");
     } finally {
       setCheckoutLoading(null);
     }

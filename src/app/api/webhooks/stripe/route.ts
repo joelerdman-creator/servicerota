@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStripe, planIdFromPriceId } from "@/lib/stripe";
-import { firestore } from "@/firebase/admin-app";
 import Stripe from "stripe";
 
 /**
@@ -10,6 +9,20 @@ import Stripe from "stripe";
  * record in sync. The churchId is stored as metadata on the Stripe customer.
  */
 export async function POST(request: NextRequest) {
+  let firestore: any;
+  try {
+    const module = await import("@/firebase/admin-app");
+    firestore = module.firestore;
+  } catch (e: any) {
+    console.error("[stripe-webhook] Failed to load admin-app:", e?.message);
+    return new NextResponse("Server not configured", { status: 500 });
+  }
+
+  if (!firestore) {
+    console.error("[stripe-webhook] firestore is null");
+    return new NextResponse("Server not configured", { status: 500 });
+  }
+
   const body = await request.text();
   const sig = request.headers.get("stripe-signature");
 
@@ -19,14 +32,10 @@ export async function POST(request: NextRequest) {
 
   let event: Stripe.Event;
   try {
-    event = getStripe().webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    event = getStripe().webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET.trim());
   } catch (err: any) {
     console.error("Stripe webhook signature verification failed:", err.message);
     return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
-  }
-
-  if (!firestore) {
-    return new NextResponse("Server not configured", { status: 500 });
   }
 
   try {
@@ -85,7 +94,6 @@ export async function POST(request: NextRequest) {
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
-        // Find church by stripeCustomerId
         if (!invoice.customer) break;
         const snap = await firestore
           .collection("churches")

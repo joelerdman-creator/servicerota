@@ -85,6 +85,7 @@ export default function AdminDashboardPage() {
 
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingReports, setLoadingReports] = useState(true);
+  const [pendingRoleRequests, setPendingRoleRequests] = useState(0);
 
   const { data: allUsers, isLoading: usersLoading } = useCollection<Volunteer>(
     useMemoFirebase(
@@ -124,6 +125,15 @@ export default function AdminDashboardPage() {
           return eventDate >= start && eventDate <= end;
         }).length;
       };
+
+      // Fetch pending role requests count
+      const roleRequestsSnap = await getDocs(
+        query(
+          collection(firestore, `churches/${churchId}/role_requests`),
+          where("status", "==", "pending"),
+        ),
+      );
+      setPendingRoleRequests(roleRequestsSnap.size);
 
       setStats({
         pendingVolunteers: userList.filter((u: any) => u.status === "pending_approval").length,
@@ -251,7 +261,18 @@ export default function AdminDashboardPage() {
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-lg">Recommended Next Step</h3>
-                {stats.pendingVolunteers > 0 ? (
+                {pendingRoleRequests > 0 && stats.pendingVolunteers === 0 ? (
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-muted-foreground">
+                      You have <span className="font-bold text-foreground">{pendingRoleRequests} role request{pendingRoleRequests > 1 ? "s" : ""}</span> awaiting review from volunteers who want to serve in new roles.
+                    </p>
+                    <Link href="/dashboard/admin/volunteers?tab=role-requests">
+                      <Button size="sm" className="ml-4 shrink-0">
+                        Review <ArrowRight className="ml-1 h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                ) : stats.pendingVolunteers > 0 ? (
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-muted-foreground">
                       You have <span className="font-bold text-foreground">{stats.pendingVolunteers} volunteer{stats.pendingVolunteers > 1 ? "s" : ""}</span> awaiting approval. Review and approve them so they can start serving.
@@ -302,7 +323,7 @@ export default function AdminDashboardPage() {
         </Card>
       )}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-        <Link href="/dashboard/admin/volunteers" className="xl:col-span-1 flex">
+        <Link href="/dashboard/admin/volunteers" className="flex">
           <Card className="hover:bg-muted/50 transition-colors h-full w-full flex flex-col border-brand-accent/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-3 text-lg">
@@ -316,6 +337,24 @@ export default function AdminDashboardPage() {
               </div>
               <p className="text-xs text-muted-foreground mt-2">
                 Click to review and approve new volunteers.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/dashboard/admin/volunteers?tab=role-requests" className="flex">
+          <Card className="hover:bg-muted/50 transition-colors h-full w-full flex flex-col border-brand-accent/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3 text-lg">
+                <CheckCircle2 className="h-6 w-6 text-brand-accent" />
+                Role Requests
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-5xl font-bold">
+                {loadingStats ? "..." : pendingRoleRequests}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Volunteers requesting to serve in new roles.
               </p>
             </CardContent>
           </Card>

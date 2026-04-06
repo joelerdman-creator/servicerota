@@ -10,6 +10,10 @@ import {
   Repeat,
   ChevronDown,
   Check,
+  Settings,
+  CreditCard,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +38,6 @@ import toast from "react-hot-toast";
 import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { doc } from "firebase/firestore";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { MODULES } from "@/config/modules";
 
 interface UserProfile {
@@ -47,6 +50,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const auth = useAuth();
   const firestore = useFirestore();
   const [isSuperUser, setIsSuperUser] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    setIsDark(stored === "dark" || (!stored && prefersDark));
+  }, []);
+
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  };
 
   // Determine active module. Default to RotaScribe ("rota")
   // Since Rota is at `/dashboard/admin`, we check specific sub-modules first.
@@ -169,7 +186,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             {/* Desktop Navigation */}
             <nav className="hidden lg:flex items-center gap-1">
-              {activeModule.navItems.map((item) => {
+              {activeModule.navItems.filter(item => !item.rightAlign).map((item) => {
                 const isActive = (pathname.startsWith(item.href) && item.href !== activeModule.basePath) || (pathname === item.href);
                 return (
                   <Link
@@ -189,6 +206,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Right-aligned nav items (e.g. Help) */}
+            {activeModule.navItems.filter(item => item.rightAlign).map((item) => {
+              const isActive = pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "hidden lg:flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-white/10",
+                    isActive ? "bg-white/20 text-white" : "text-nav-foreground/80"
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
+
             {/* Mobile Navigation Toggle */}
             <Sheet>
               <SheetTrigger asChild>
@@ -252,9 +287,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </SheetContent>
             </Sheet>
 
-            {/* Dark Mode Toggle */}
-            <ThemeToggle />
-
             {/* User Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -275,6 +307,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard/volunteer/profile">My Profile</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/admin/settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/admin/billing">
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Billing
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={toggleTheme}>
+                  {isDark ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                  {isDark ? "Light Mode" : "Dark Mode"}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {isSuperUser && (

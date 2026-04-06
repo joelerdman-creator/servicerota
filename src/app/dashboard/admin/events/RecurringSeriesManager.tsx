@@ -242,8 +242,10 @@ export function RecurringSeriesManager({
       }
 
       // 4. Clean up volunteer preferences (availableRecurringEventSeriesIds)
+      // Volunteer data lives in the root /users collection, not a church subcollection
       const volunteersQuery = query(
-        collection(firestore, `churches/${userProfile.churchId}/volunteers`),
+        collection(firestore, "users"),
+        where("churchId", "==", userProfile.churchId),
         where("availableRecurringEventSeriesIds", "array-contains", seriesToDelete.seriesId),
       );
       const volunteersSnap = await getDocs(volunteersQuery);
@@ -465,7 +467,7 @@ export function RecurringSeriesManager({
                               <TableCell>{series.eventCount}</TableCell>
                               <TableCell>{format(series.lastEventDate, "PP")}</TableCell>
                               <TableCell>
-                                <span className={`text-xs font-medium px-2 py-1 rounded-full ${isOngoing ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"}`}>
+                                <span className={`text-xs font-medium px-2 py-1 rounded-full ${isOngoing ? "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300" : "bg-secondary text-secondary-foreground"}`}>
                                   {isOngoing ? "Ongoing" : "Ends " + format(new Date(metadata!.endDate!), "PP")}
                                 </span>
                               </TableCell>

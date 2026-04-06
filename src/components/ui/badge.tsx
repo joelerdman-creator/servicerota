@@ -16,6 +16,12 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground border-brand-accent",
+        // Amber — adjacent to the brand-accent orange; use for pending/open/action-needed states
+        warning:
+          "border-transparent bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-300",
+        // Teal — complements navy; use for active/ongoing/healthy states
+        success:
+          "border-transparent bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900/40 dark:text-teal-300",
       },
     },
     defaultVariants: {

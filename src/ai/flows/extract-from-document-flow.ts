@@ -73,7 +73,7 @@ Extract as much of the following information as you can find:
 
       const { output } = await ai.generate({
         prompt,
-        model: "googleai/gemini-2.5-flash-lite",
+        model: "googleai/gemini-2.5-flash",
         output: { schema: DocumentExtractionOutputSchema },
         config: {
           temperature: 0.1,
@@ -93,11 +93,13 @@ Extract as much of the following information as you can find:
       console.log(`Successfully extracted data from document.`);
       return output;
     } catch (error: any) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`Document extraction failed:`, errorMessage);
-      throw new Error(
-        `Failed to process the document. The AI model returned an error: ${errorMessage}`,
-      );
+      const raw = error instanceof Error ? error.message : String(error);
+      console.error(`Document extraction failed:`, raw);
+      // Genkit validation errors include the full schema JSON — don't expose that to the user
+      const clean = raw.length > 300 || raw.includes('"$schema"') || raw.includes('"additionalProperties"')
+        ? "The AI could not extract structured data from this file. Try a different file or format."
+        : raw;
+      throw new Error(clean);
     }
   },
 );

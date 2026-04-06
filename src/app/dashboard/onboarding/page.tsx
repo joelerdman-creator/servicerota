@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stepper, StepperItem, useExternalStepper } from "@/components/ui/stepper";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check, X } from "lucide-react";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import { extractDataFromText } from "@/ai/flows/extract-data-flow";
 import { useRouter } from "next/navigation";
@@ -563,6 +564,14 @@ export default function OnboardingWizardPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-muted/40 p-4">
       <div className="w-full max-w-5xl">
+        <div className="flex justify-end mb-2">
+          <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground gap-1.5">
+            <Link href="/dashboard/admin">
+              <X className="h-4 w-4" />
+              Exit to Dashboard
+            </Link>
+          </Button>
+        </div>
         <Card>
           <CardHeader>
             <Stepper {...stepper}>

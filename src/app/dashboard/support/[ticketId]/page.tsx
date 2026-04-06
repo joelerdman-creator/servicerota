@@ -177,7 +177,7 @@ export default function TicketDetailsPage() {
   const getStatusVariant = (status?: SupportTicket["status"]) => {
     switch (status) {
       case "Open":
-        return "destructive";
+        return "warning";
       case "In Progress":
         return "secondary";
       case "Closed":

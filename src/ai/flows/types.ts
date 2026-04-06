@@ -12,7 +12,7 @@ export type ParsedEvent = z.infer<typeof ParsedEventSchema>;
 export const VolunteerSchema = z.object({
   firstName: z.string().describe("The volunteer's first name."),
   lastName: z.string().describe("The volunteer's last name."),
-  email: z.string().email().nullable().optional().describe("The volunteer's email address."),
+  email: z.string().nullable().optional().describe("The volunteer's email address."),
   inferredRoleNames: z.array(z.string()).optional().describe("A list of role names this volunteer was seen performing."),
 });
 export type Volunteer = z.infer<typeof VolunteerSchema>;

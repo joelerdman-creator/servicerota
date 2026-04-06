@@ -10,15 +10,28 @@ import {
   useDoc,
   errorEmitter,
 } from "@/firebase";
-import { collection, query, doc, updateDoc, deleteDoc, arrayUnion, arrayRemove, addDoc, serverTimestamp, getDocs, where, limit } from "firebase/firestore";
+import { collection, query, doc, updateDoc, deleteDoc, arrayUnion, arrayRemove, addDoc, serverTimestamp, getDocs, where, limit, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
 import { FirestorePermissionError } from "@/firebase/errors";
-import { Search, PlusCircle, Users, Loader2 } from "lucide-react";
+import { Search, PlusCircle, Users, Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { sendVolunteerInvite } from "./actions";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { sendVolunteerInvite, sendRoleRequestApprovedNotification, sendRoleRequestRejectedNotification } from "./actions";
 import {
   Select,
   SelectContent,
@@ -27,6 +40,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useSearchParams } from "next/navigation";
 import { useVolunteers } from "./hooks/useVolunteers";
 import { VolunteerList } from "./components/VolunteerList";
 import { VolunteerManagementSheet } from "./components/VolunteerManagementSheet";
@@ -36,11 +50,32 @@ import { AdminProfile, ChurchProfile, Volunteer, RecurringService } from "./type
 export default function VolunteersPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams.get("tab") === "role-requests" ? "role-requests" : "volunteers";
 
   const [selectedVolunteer, setSelectedVolunteer] = useState<WithId<Volunteer> | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearchTerm = useDebounce(searchInput, 300);
+
+  // Role requests state
+  interface RoleRequest {
+    id: string;
+    volunteerId: string;
+    volunteerName: string;
+    volunteerEmail: string;
+    roleId: string;
+    roleName: string;
+    status: "pending" | "approved" | "rejected";
+    message?: string;
+    requestedAt?: any;
+  }
+  const [roleRequests, setRoleRequests] = useState<RoleRequest[]>([]);
+  const [areRequestsLoading, setAreRequestsLoading] = useState(true);
+  const [rejectDialogRequest, setRejectDialogRequest] = useState<RoleRequest | null>(null);
+  const [rejectionNote, setRejectionNote] = useState("");
+  const [skipNotification, setSkipNotification] = useState(false);
+  const [isProcessingRequest, setIsProcessingRequest] = useState(false);
 
   // 1. Get Admin Profile
   const adminDocRef = useMemoFirebase(
@@ -116,6 +151,109 @@ export default function VolunteersPage() {
     };
     fetchRecurringServices();
   }, [firestore, adminProfile?.churchId]);
+
+  // Fetch pending role requests
+  useEffect(() => {
+    if (!firestore || !adminProfile?.churchId) return;
+    const fetchRequests = async () => {
+      setAreRequestsLoading(true);
+      try {
+        const q = query(
+          collection(firestore, `churches/${adminProfile.churchId}/role_requests`),
+          where("status", "==", "pending"),
+          orderBy("requestedAt", "desc"),
+        );
+        const snap = await getDocs(q);
+        setRoleRequests(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RoleRequest, "id">) })));
+      } catch (e) { console.error(e); }
+      setAreRequestsLoading(false);
+    };
+    fetchRequests();
+  }, [firestore, adminProfile?.churchId]);
+
+  const refreshRoleRequests = async () => {
+    if (!firestore || !adminProfile?.churchId) return;
+    const q = query(
+      collection(firestore, `churches/${adminProfile.churchId}/role_requests`),
+      where("status", "==", "pending"),
+      orderBy("requestedAt", "desc"),
+    );
+    const snap = await getDocs(q);
+    setRoleRequests(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RoleRequest, "id">) })));
+  };
+
+  const getAdminBccEmails = () =>
+    allVolunteers.filter((v) => v.isAdmin && v.email).map((v) => v.email as string);
+
+  const handleApproveRoleRequest = async (request: RoleRequest) => {
+    if (!firestore || !adminProfile?.churchId) return;
+    setIsProcessingRequest(true);
+    try {
+      // Mark request approved
+      await updateDoc(
+        doc(firestore, `churches/${adminProfile.churchId}/role_requests`, request.id),
+        { status: "approved", reviewedAt: serverTimestamp(), reviewedBy: user?.uid },
+      );
+      // Add role to volunteer's profile
+      await updateDoc(doc(firestore, "users", request.volunteerId), {
+        availableRoleIds: arrayUnion(request.roleId),
+      });
+      // Send approval email
+      if (request.volunteerEmail) {
+        void sendRoleRequestApprovedNotification({
+          volunteerEmail: request.volunteerEmail,
+          volunteerName: request.volunteerName,
+          roleName: request.roleName,
+          churchName: churchProfile?.name || "your church",
+          loginUrl: `${window.location.origin}/dashboard/volunteer/preferences`,
+          adminBccEmails: getAdminBccEmails(),
+        });
+      }
+      toast.success(`${request.volunteerName} approved as ${request.roleName}.`);
+      await refreshRoleRequests();
+      refresh();
+    } catch (e) {
+      toast.error("Failed to approve request.");
+    } finally {
+      setIsProcessingRequest(false);
+    }
+  };
+
+  const handleRejectRoleRequest = async () => {
+    if (!rejectDialogRequest || !firestore || !adminProfile?.churchId) return;
+    setIsProcessingRequest(true);
+    try {
+      await updateDoc(
+        doc(firestore, `churches/${adminProfile.churchId}/role_requests`, rejectDialogRequest.id),
+        {
+          status: "rejected",
+          reviewedAt: serverTimestamp(),
+          reviewedBy: user?.uid,
+          rejectionNote: rejectionNote.trim() || null,
+          notifyVolunteer: !skipNotification,
+        },
+      );
+      if (!skipNotification && rejectDialogRequest.volunteerEmail) {
+        void sendRoleRequestRejectedNotification({
+          volunteerEmail: rejectDialogRequest.volunteerEmail,
+          volunteerName: rejectDialogRequest.volunteerName,
+          roleName: rejectDialogRequest.roleName,
+          churchName: churchProfile?.name || "your church",
+          rejectionNote: rejectionNote.trim() || undefined,
+          adminBccEmails: getAdminBccEmails(),
+        });
+      }
+      toast.success("Request declined.");
+      setRejectDialogRequest(null);
+      setRejectionNote("");
+      setSkipNotification(false);
+      await refreshRoleRequests();
+    } catch (e) {
+      toast.error("Failed to decline request.");
+    } finally {
+      setIsProcessingRequest(false);
+    }
+  };
 
   // Mutators!
   const handleAddVolunteer = async (data: AddVolunteerData) => {
@@ -305,87 +443,155 @@ export default function VolunteersPage() {
           </div>
         </header>
 
-        <Card className="border-brand-accent/20">
-          <CardHeader>
-            <CardTitle>User List</CardTitle>
-            <CardDescription>
-              {areVolunteersLoading ? "Loading users..." : `Found ${totalCount} user(s).`}
-            </CardDescription>
+        <Tabs defaultValue={defaultTab}>
+          <TabsList>
+            <TabsTrigger value="volunteers">Volunteers</TabsTrigger>
+            <TabsTrigger value="role-requests" className="gap-2">
+              Role Requests
+              {roleRequests.length > 0 && (
+                <Badge className="h-5 min-w-5 px-1 text-xs">{roleRequests.length}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-            <div className="flex flex-col sm:flex-row gap-4 pt-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name..."
-                  className="pl-9"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                />
-              </div>
-              <Select value={filterRole} onValueChange={setFilterRole}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="All Roles" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  {roles?.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filterService} onValueChange={setFilterService}>
-                <SelectTrigger className="w-full sm:w-[220px]">
-                  <SelectValue placeholder="All Services" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Services</SelectItem>
-                  {recurringServices?.map((s) => (
-                    <SelectItem key={s.seriesId} value={s.seriesId}>
-                      {s.eventName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
+          {/* Volunteers Tab */}
+          <TabsContent value="volunteers" className="mt-6">
+            <Card className="border-brand-accent/20">
+              <CardHeader>
+                <CardTitle>User List</CardTitle>
+                <CardDescription>
+                  {areVolunteersLoading ? "Loading users..." : `Found ${totalCount} user(s).`}
+                </CardDescription>
+                <div className="flex flex-col sm:flex-row gap-4 pt-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by name..."
+                      className="pl-9"
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                    />
+                  </div>
+                  <Select value={filterRole} onValueChange={setFilterRole}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="All Roles" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Roles</SelectItem>
+                      {roles?.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterService} onValueChange={setFilterService}>
+                    <SelectTrigger className="w-full sm:w-[220px]">
+                      <SelectValue placeholder="All Services" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Services</SelectItem>
+                      {recurringServices?.map((s) => (
+                        <SelectItem key={s.seriesId} value={s.seriesId}>{s.eventName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {areVolunteersLoading ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                  </div>
+                ) : (
+                  <VolunteerList
+                    volunteers={volunteers}
+                    recurringServices={recurringServices}
+                    onApprove={handleApprove}
+                    onDeny={handleDeny}
+                    onSelect={(v) => setSelectedVolunteer(v)}
+                  />
+                )}
+                <div className="flex items-center justify-end space-x-2 py-4">
+                  <Button variant="outline" size="sm" onClick={handlePrevPage} disabled={page <= 1}>Previous</Button>
+                  <span className="text-sm text-muted-foreground px-2">Page {page} of {totalPages}</span>
+                  <Button variant="outline" size="sm" onClick={handleNextPage} disabled={page >= totalPages}>Next</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-          <CardContent>
-            {areVolunteersLoading ? (
-              <div className="p-8 text-center text-muted-foreground">
-                <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-              </div>
-            ) : (
-              <VolunteerList
-                volunteers={volunteers}
-                recurringServices={recurringServices}
-                onApprove={handleApprove}
-                onDeny={handleDeny}
-                onSelect={(v) => setSelectedVolunteer(v)}
-              />
-            )}
-            <div className="flex items-center justify-end space-x-2 py-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePrevPage}
-                disabled={page <= 1}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground px-2">Page {page} of {totalPages}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleNextPage}
-                disabled={page >= totalPages}
-              >
-                Next
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Role Requests Tab */}
+          <TabsContent value="role-requests" className="mt-6">
+            <Card className="border-brand-accent/20">
+              <CardHeader>
+                <CardTitle>Pending Role Requests</CardTitle>
+                <CardDescription>
+                  Volunteers who have requested to start serving in a new role.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {areRequestsLoading ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                  </div>
+                ) : roleRequests.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    <Clock className="h-8 w-8 mx-auto mb-3 opacity-40" />
+                    <p>No pending role requests.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {roleRequests.map((request) => (
+                      <div
+                        key={request.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{request.volunteerName}</span>
+                            <span className="text-muted-foreground text-sm">→</span>
+                            <Badge variant="secondary">{request.roleName}</Badge>
+                          </div>
+                          {request.volunteerEmail && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{request.volunteerEmail}</p>
+                          )}
+                          {request.message && (
+                            <p className="text-sm text-muted-foreground mt-2 italic border-l-2 pl-3 border-muted">
+                              &ldquo;{request.message}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                            onClick={() => {
+                              setRejectDialogRequest(request);
+                              setRejectionNote("");
+                              setSkipNotification(false);
+                            }}
+                            disabled={isProcessingRequest}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Decline
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleApproveRoleRequest(request)}
+                            disabled={isProcessingRequest}
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-1" />
+                            Approve
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <VolunteerManagementSheet
@@ -407,6 +613,70 @@ export default function VolunteersPage() {
         recurringServices={recurringServices}
         onAddVolunteer={handleAddVolunteer}
       />
+
+      {/* Reject Role Request Dialog */}
+      <Dialog
+        open={!!rejectDialogRequest}
+        onOpenChange={(open) => !open && setRejectDialogRequest(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Decline Role Request</DialogTitle>
+            <DialogDescription>
+              Declining <strong>{rejectDialogRequest?.volunteerName}</strong>&apos;s request to serve as <strong>{rejectDialogRequest?.roleName}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {!skipNotification && (
+              <div className="space-y-2">
+                <Label htmlFor="rejection-note">
+                  Message to volunteer{" "}
+                  <span className="text-muted-foreground font-normal">(optional)</span>
+                </Label>
+                <Textarea
+                  id="rejection-note"
+                  placeholder="e.g. We appreciate your interest! We currently have enough lectors scheduled, but please check back in a few months."
+                  value={rejectionNote}
+                  onChange={(e) => setRejectionNote(e.target.value)}
+                  rows={3}
+                />
+              </div>
+            )}
+            <div
+              className="flex items-start gap-3 p-3 rounded-md border cursor-pointer hover:bg-muted/50"
+              onClick={() => setSkipNotification((v) => !v)}
+            >
+              <Checkbox
+                id="skip-notification"
+                checked={skipNotification}
+                onCheckedChange={(v) => setSkipNotification(Boolean(v))}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="skip-notification" className="cursor-pointer font-medium">
+                  Don&apos;t send a response — I&apos;ll reach out personally
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  No email will be sent. Use this if you prefer to have a personal conversation.
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDialogRequest(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectRoleRequest}
+              disabled={isProcessingRequest}
+            >
+              {isProcessingRequest && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirm Decline
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

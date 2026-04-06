@@ -21,8 +21,7 @@ export interface UserProfile {
   isHouseholdManager?: boolean;
   availableRoleIds?: string[];
   availableRecurringEventSeriesIds?: string[];
-  assignmentCount?: number;
-  lastAssigned?: any;
+  assignmentHistory?: { roleTemplateId: string; date: string }[];
   unavailability?: string[];
   servingPreference?: string;
   createdAt?: any;
@@ -87,8 +86,7 @@ export interface Volunteer {
   photoURL?: string;
   availableRoleIds?: string[];
   availableRecurringEventSeriesIds?: string[];
-  assignmentCount?: number;
-  lastAssigned?: any;
+  assignmentHistory?: { roleTemplateId: string; date: string }[];
   unavailability?: string[];
   servingPreference?: string;
   familyId?: string;

@@ -20,6 +20,12 @@ export const RoleForAssignmentSchema = z.object({
   status: z.string().optional(),
 });
 
+export const AssignmentHistoryEntrySchema = z.object({
+  roleTemplateId: z.string(),
+  date: z.string(), // ISO date string (YYYY-MM-DD)
+});
+export type AssignmentHistoryEntry = z.infer<typeof AssignmentHistoryEntrySchema>;
+
 export const VolunteerForAssignmentSchema = z.object({
   id: z.string(),
   firstName: z.string(),
@@ -27,8 +33,8 @@ export const VolunteerForAssignmentSchema = z.object({
   email: z.string().nullable(),
   availableRoleIds: z.array(z.string()).optional(),
   availableRecurringEventSeriesIds: z.array(z.string()).optional(),
-  assignmentCount: z.number().optional().default(0),
-  lastAssigned: z.string().optional(),
+  // Rolling history of assignments per role. Replaces legacy assignmentCount / lastAssigned.
+  assignmentHistory: z.array(AssignmentHistoryEntrySchema).optional().default([]),
   unavailability: z.array(z.string()).optional(),
   servingPreference: z.string().optional(),
   familyId: z.string().optional(),
@@ -71,8 +77,8 @@ const AssignmentSchema = z.object({
 
 const UserUpdateSchema = z.object({
   volunteerId: z.string(),
-  newAssignmentCount: z.number(),
-  newLastAssigned: z.string(),
+  // New history entries added during this scheduling run — append via arrayUnion
+  newHistoryEntries: z.array(AssignmentHistoryEntrySchema),
 });
 
 export const AssignmentPlanSchema = z.object({
@@ -85,5 +91,3 @@ export const AssignmentPlanSchema = z.object({
     ),
 });
 export type AssignmentPlan = z.infer<typeof AssignmentPlanSchema>;
-
-    

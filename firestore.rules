@@ -135,6 +135,15 @@ service cloud.firestore {
       }
     }
     
+    // --- GRAPHIC ASSETS ---
+    // Global stock images used in church flyer/sharing pages.
+    // Writes are server-side only (Admin SDK); client reads limited to signed-in admins.
+    match /graphic_assets/{assetId} {
+      allow read: if isSuperUser() ||
+        (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
+      allow write: if isSuperUser();
+    }
+
     // --- SUPPORT TICKETS ---
     match /support_tickets/{ticketId} {
       allow create: if isSignedIn() && request.resource.data.submittedByUid == request.auth.uid;

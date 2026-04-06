@@ -58,10 +58,12 @@ import {
   deleteDoc,
   updateDoc,
   getDoc,
+  arrayUnion,
 } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
 import { useCollection, useMemoFirebase, WithId } from "@/firebase";
 import { autoAssignVolunteers } from "@/lib/scheduling/auto-assign";
+import { normalizeVolunteerForScheduling } from "@/lib/utils";
 import { VolunteerCombobox } from "@/components/VolunteerCombobox";
 import { sendNotification } from "@/ai/flows/send-notification-flow";
 import type {
@@ -379,12 +381,7 @@ export function EventDetailSheet({
       return;
     }
     setIsAutoAssigning(true);
-    const plainVolunteers = volunteers.map((v) => {
-      const plainV: any = { ...v };
-      if (plainV.lastAssigned && typeof plainV.lastAssigned.toDate === "function") plainV.lastAssigned = plainV.lastAssigned.toDate().toISOString();
-      if (plainV.createdAt && typeof plainV.createdAt.toDate === "function") plainV.createdAt = plainV.createdAt.toDate().toISOString();
-      return plainV;
-    });
+    const plainVolunteers = volunteers.map(normalizeVolunteerForScheduling);
 
     const aiInput: AutoAssignInput = {
       event: { id: editingEvent.id, eventName: editingEvent.eventName, eventDate: editingEvent.eventDate, churchId: editingEvent.churchId, seriesId: editingEvent.seriesId },
@@ -423,8 +420,7 @@ export function EventDetailSheet({
       });
       singleEventAssignmentPlan.userUpdates.forEach((u) => {
         batch.update(doc(firestore, "users", u.volunteerId), {
-          assignmentCount: u.newAssignmentCount,
-          lastAssigned: new Date(u.newLastAssigned).toISOString(),
+          assignmentHistory: arrayUnion(...u.newHistoryEntries),
         });
       });
       await batch.commit();

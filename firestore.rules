@@ -24,6 +24,14 @@ service cloud.firestore {
              userDoc.data.isAdmin == true &&
              userDoc.data.churchId == churchId;
     }
+
+    // Checks if the requesting user is an active member (volunteer or admin) of the specified church.
+    function isChurchMember(churchId) {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             userDoc.data.churchId == churchId &&
+             userDoc.data.status == "active";
+    }
     
     // --- USER PROFILES ---
     match /users/{userId} {
@@ -46,8 +54,11 @@ service cloud.firestore {
 
       // --- EVENTS ---
       match /events/{eventId} {
-        // FIX: Use resource.data instead of get() for the document itself to avoid self-reference/recursion
-        allow get, list: if resource.data.isPublished == true || isChurchAdmin(churchId);
+        // Admins can read all events. Active members can list events (needed to
+        // discover recurring series for preferences). Individual unpublished event
+        // gets are restricted to admins.
+        allow list: if isSuperUser() || isChurchAdmin(churchId) || isChurchMember(churchId);
+        allow get: if resource.data.isPublished == true || isSuperUser() || isChurchAdmin(churchId);
         allow write: if isSuperUser() || isChurchAdmin(churchId);
 
         // --- ROLES ---
@@ -77,16 +88,36 @@ service cloud.firestore {
       }
 
       // --- TEMPLATES ---
+      // Volunteers need to read role_templates to see what roles they can request.
       match /role_templates/{roleTemplateId} {
-        allow read, write: if isSuperUser() || isChurchAdmin(churchId);
+        allow read: if isSuperUser() || isChurchMember(churchId);
+        allow write: if isSuperUser() || isChurchAdmin(churchId);
       }
-      
+
       match /service_templates/{serviceTemplateId} {
         allow read, write: if isSuperUser() || isChurchAdmin(churchId);
       }
       
       match /series_metadata/{seriesId} {
         allow read, write: if isSuperUser() || isChurchAdmin(churchId);
+      }
+
+      // --- ROLE REQUESTS ---
+      match /role_requests/{requestId} {
+        // Admins can read and manage all requests for their church.
+        allow read, list: if isSuperUser() || isChurchAdmin(churchId);
+        allow update, delete: if isSuperUser() || isChurchAdmin(churchId);
+
+        // Volunteers can create a request for themselves.
+        allow create: if isChurchMember(churchId) &&
+                         request.resource.data.volunteerId == request.auth.uid &&
+                         request.resource.data.status == "pending";
+
+        // Volunteers can read and cancel (delete) their own requests.
+        allow get: if isChurchMember(churchId) && resource.data.volunteerId == request.auth.uid;
+        allow list: if isChurchMember(churchId) && request.auth != null;
+        allow delete: if isChurchMember(churchId) && resource.data.volunteerId == request.auth.uid
+                         && resource.data.status == "pending";
       }
 
       // --- USAGE COUNTERS (SMS caps etc.) ---

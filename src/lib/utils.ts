@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export function getServiceColor(serviceId: string) {
   const colors = [
-    "bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300",
+    "bg-stone-100 text-stone-700 hover:bg-stone-100 dark:bg-stone-900/30 dark:text-stone-300",
     "bg-orange-100 text-orange-700 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-300",
     "bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300",
     "bg-yellow-100 text-yellow-700 hover:bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-300",
@@ -23,7 +23,7 @@ export function getServiceColor(serviceId: string) {
     "bg-purple-100 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300",
     "bg-fuchsia-100 text-fuchsia-700 hover:bg-fuchsia-100 dark:bg-fuchsia-900/30 dark:text-fuchsia-300",
     "bg-pink-100 text-pink-700 hover:bg-pink-100 dark:bg-pink-900/30 dark:text-pink-300",
-    "bg-rose-100 text-rose-700 hover:bg-rose-100 dark:bg-rose-900/30 dark:text-rose-300"
+    "bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-900/30 dark:text-slate-300"
   ];
   let hash = 0;
   for (let i = 0; i < serviceId.length; i++) {

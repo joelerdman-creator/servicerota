@@ -132,7 +132,7 @@ export default function AdminSupportPage() {
   const getStatusVariant = (status: SupportTicket["status"]) => {
     switch (status) {
       case "Open":
-        return "destructive";
+        return "warning";
       case "In Progress":
         return "secondary";
       case "Closed":

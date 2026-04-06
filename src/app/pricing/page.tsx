@@ -133,7 +133,7 @@ export default function PricingPage() {
               onClick={() => setInterval("annual")}
             >
               Annual
-              <span className={cn("text-xs font-bold px-1.5 py-0.5 rounded-full", interval === "annual" ? "bg-green-500 text-white" : "bg-green-100 text-green-700")}>
+              <span className={cn("text-xs font-bold px-1.5 py-0.5 rounded-full", interval === "annual" ? "bg-brand-accent text-white" : "bg-amber-100 text-amber-700")}>
                 2 months free
               </span>
             </button>

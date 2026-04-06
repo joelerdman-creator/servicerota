@@ -68,7 +68,7 @@ ${input.pastedText}
 
     const { output } = await ai.generate({
       prompt,
-      model: "googleai/gemini-2.5-flash-lite",
+      model: "googleai/gemini-2.5-flash",
       output: {
         schema: ExtractDataOutputSchema,
       },

@@ -19,8 +19,7 @@ export async function extractDataFromEml(
     return JSON.parse(JSON.stringify(result));
   } catch (e: any) {
     console.error("AI Extraction Error (EML):", e);
-    // Re-throw a clean error to be caught by the client
-    throw new Error(e.message || JSON.stringify(e));
+    throw new Error(e.message || "EML extraction failed.");
   }
 }
 
@@ -86,7 +85,7 @@ Extract as much of the following information as you can find:
       
       const { output } = await ai.generate({
         prompt: `${finalPrompt}\n\n**Document Content:**\n\n${combinedContent}`,
-        model: "googleai/gemini-2.5-flash-lite",
+        model: "googleai/gemini-2.5-flash",
         output: { schema: DocumentExtractionOutputSchema },
         config: { 
             temperature: 0.1,
@@ -105,8 +104,13 @@ Extract as much of the following information as you can find:
       return output;
 
     } catch (error) {
-      console.error("Failed to process EML file:", error);
-      throw new Error(`Failed to parse or analyze the .eml file. Error: ${error instanceof Error ? error.message : String(error)}`);
+      const raw = error instanceof Error ? error.message : String(error);
+      console.error("Failed to process EML file (raw):", raw);
+      // Genkit validation errors include the full schema JSON — don't expose that to the user
+      const clean = raw.length > 300 || raw.includes('"$schema"') || raw.includes('"additionalProperties"')
+        ? "The AI could not extract structured data from this file. Try a different file or format."
+        : raw;
+      throw new Error(clean);
     }
   },
 );

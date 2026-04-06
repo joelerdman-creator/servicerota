@@ -1,50 +1,18 @@
 
 "use client";
 
-import { useUser, useDoc, useFirestore } from "@/firebase";
-import { useMemoFirebase } from "@/firebase/hooks/use-memo-firebase";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/firebase";
-import { signOut } from "firebase/auth";
-import toast from "react-hot-toast";
+import { useUser } from "@/firebase";
 import Link from "next/link";
-import { doc } from "firebase/firestore";
-import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Calendar, Users, CalendarOff, LifeBuoy, ListTodo, UserCircle } from "lucide-react";
-
-interface UserProfile {
-  isAdmin?: boolean;
-}
+import { Calendar, Users, CalendarOff, LifeBuoy, ListTodo } from "lucide-react";
 
 export default function VolunteerDashboardPage() {
   const { user } = useUser();
-  const auth = useAuth();
-  const firestore = useFirestore();
-  const router = useRouter();
-
-  const userDocRef = useMemoFirebase(
-    () => (user?.uid && firestore ? doc(firestore, "users", user.uid) : null),
-    [user?.uid, firestore],
-  );
-  const { data: userProfile } = useDoc<UserProfile>(userDocRef);
-
-  const handleLogOut = async () => {
-    if (!auth) return;
-    try {
-      await signOut(auth);
-      await fetch("/api/auth/session", { method: "DELETE" });
-      toast.success("Signed out successfully.");
-      window.location.href = "/";
-    } catch (error: any) {
-      toast.error((error as Error).message || "Failed to sign out.");
-    }
-  };
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-screen bg-background pt-8 pb-8 px-4 sm:px-8">
+    <div className="flex flex-col items-center justify-start pb-8">
       <div className="w-full max-w-5xl">
-        <header className="mb-12 text-center">
+        <header className="mb-12 text-center pt-8">
           <h1 className="text-3xl lg:text-4xl font-bold">
             Welcome, {user?.displayName || "Volunteer"}!
           </h1>
@@ -74,12 +42,12 @@ export default function VolunteerDashboardPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-xl">
                   <ListTodo className="h-8 w-8 text-brand-accent" />
-                  Which Services I Attend
+                  My Serving Preferences
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex-grow">
                 <p className="text-muted-foreground">
-                  Tell your admin which regular services you attend so they can schedule you at the right times.
+                  Tell your admin which services you attend and which roles you can serve in.
                 </p>
               </CardContent>
             </Card>
@@ -89,7 +57,7 @@ export default function VolunteerDashboardPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-xl">
                   <CalendarOff className="h-8 w-8 text-brand-accent" />
-                  My Block-out Dates
+                  My Availability
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex-grow">
@@ -114,21 +82,6 @@ export default function VolunteerDashboardPage() {
               </CardContent>
             </Card>
           </Link>
-          <Link href="/dashboard/volunteer/profile" className="flex">
-            <Card className="hover:bg-muted/50 transition-colors h-full w-full flex flex-col group border-brand-accent/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-xl">
-                  <UserCircle className="h-8 w-8 text-brand-accent" />
-                  My Profile
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex-grow">
-                <p className="text-muted-foreground">
-                  Update your name and profile photo.
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
           <Link href="/dashboard/support?from=volunteer" className="lg:col-span-2 flex">
             <Card className="hover:bg-muted/50 transition-colors h-full w-full flex flex-col group border-brand-accent/20">
               <CardHeader>
@@ -145,17 +98,8 @@ export default function VolunteerDashboardPage() {
             </Card>
           </Link>
         </main>
-        <footer className="mt-12 flex justify-center items-center gap-4">
-          {userProfile?.isAdmin && (
-            <Button asChild variant="outline">
-              <Link href="/dashboard/admin">Switch to Admin View</Link>
-            </Button>
-          )}
-          <Button onClick={handleLogOut} variant="ghost" className="text-muted-foreground">
-            Log Out
-          </Button>
-        </footer>
       </div>
     </div>
   );
 }
+

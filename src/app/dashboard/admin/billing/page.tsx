@@ -218,7 +218,7 @@ export default function BillingPage() {
               </Badge>
             )}
             {isActive && (
-              <Badge variant="secondary" className="gap-1 bg-green-100 text-green-800">
+              <Badge variant="success" className="gap-1">
                 <CheckCircle2 className="h-3 w-3" /> Active
               </Badge>
             )}

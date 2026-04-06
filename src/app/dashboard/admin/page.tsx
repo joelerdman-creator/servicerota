@@ -4,7 +4,8 @@
 import { useUser, useFirestore, useCollection, useDoc } from "@/firebase";
 import { useMemoFirebase } from "@/firebase/hooks/use-memo-firebase";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { UserCheck, EyeOff, Users, CalendarIcon, Loader2, Sparkles, ArrowRight, AlertTriangle, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { UserCheck, EyeOff, Users, CalendarIcon, Loader2, Sparkles, ArrowRight, AlertTriangle, AlertCircle, Clock, CheckCircle2, ShieldAlert } from "lucide-react";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
 import {
   collection,
@@ -52,6 +53,19 @@ interface Volunteer {
   id: string;
   firstName: string;
   lastName: string;
+  role?: string;
+  status?: string;
+  availableRoleIds?: string[];
+  unavailability?: string[];
+}
+
+interface CoverageIssue {
+  kind: "bench" | "date";
+  severity: "critical" | "warning";
+  roleName: string;
+  qualifiedCount: number;
+  eventName?: string;
+  eventDate?: string;
 }
 
 export default function AdminDashboardPage() {
@@ -86,6 +100,7 @@ export default function AdminDashboardPage() {
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingReports, setLoadingReports] = useState(true);
   const [pendingRoleRequests, setPendingRoleRequests] = useState(0);
+  const [coverageIssues, setCoverageIssues] = useState<CoverageIssue[]>([]);
 
   const { data: allUsers, isLoading: usersLoading } = useCollection<Volunteer>(
     useMemoFirebase(
@@ -151,6 +166,100 @@ export default function AdminDashboardPage() {
         ),
       });
       setLoadingStats(false);
+
+      // --- Coverage analysis ---
+      const roleTemplatesSnap = await getDocs(
+        collection(firestore, `churches/${churchId}/role_templates`),
+      );
+      const roleTemplateList = roleTemplatesSnap.docs.map((d) => ({
+        id: d.id,
+        name: d.data().name as string,
+      }));
+
+      // Active volunteers: exclude admins, include volunteers regardless of status field presence
+      const activeVolunteers = (allUsers ?? []).filter(
+        (u) => u.role !== "admin",
+      );
+
+      const issues: CoverageIssue[] = [];
+
+      // 1. Structural bench depth — roles where overall qualified count is thin
+      for (const rt of roleTemplateList) {
+        const qualifiedCount = activeVolunteers.filter((v) =>
+          (v.availableRoleIds ?? []).includes(rt.id),
+        ).length;
+        if (qualifiedCount <= 3) {
+          issues.push({
+            kind: "bench",
+            severity: qualifiedCount <= 1 ? "critical" : "warning",
+            roleName: rt.name,
+            qualifiedCount,
+          });
+        }
+      }
+
+      // 2. Date-specific gaps — upcoming events where an unfilled role has ≤ 1 available volunteer
+      const fourteenDaysFromNow = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      const upcomingEventDocs = eventsSnapshot.docs
+        .filter((d) => {
+          const date = new Date(d.data().eventDate);
+          return date >= now && date <= fourteenDaysFromNow;
+        })
+        .slice(0, 20); // cap reads
+
+      const upcomingRolesFetches = await Promise.all(
+        upcomingEventDocs.map(async (eventDoc) => ({
+          eventData: eventDoc.data(),
+          roles: (await getDocs(collection(firestore, `churches/${churchId}/events/${eventDoc.id}/roles`))).docs,
+        })),
+      );
+
+      const seenDateRole = new Set<string>();
+      for (const { eventData, roles } of upcomingRolesFetches) {
+        const eventDateStr = new Date(eventData.eventDate).toISOString().split("T")[0];
+
+        for (const roleDoc of roles) {
+          const roleData = roleDoc.data();
+          if (roleData.assignedVolunteerId) continue;
+
+          const rt = roleTemplateList.find(
+            (t) => t.name.trim().toLowerCase() === roleData.roleName?.trim().toLowerCase(),
+          );
+          if (!rt) continue;
+
+          const key = `${eventDateStr}-${rt.id}`;
+          if (seenDateRole.has(key)) continue;
+          seenDateRole.add(key);
+
+          const availableCount = activeVolunteers.filter((v) => {
+            if (!(v.availableRoleIds ?? []).includes(rt.id)) return false;
+            if ((v.unavailability ?? []).includes(eventDateStr)) return false;
+            return true;
+          }).length;
+
+          if (availableCount <= 1) {
+            issues.push({
+              kind: "date",
+              severity: availableCount === 0 ? "critical" : "warning",
+              roleName: roleData.roleName,
+              qualifiedCount: availableCount,
+              eventName: eventData.eventName,
+              eventDate: eventData.eventDate,
+            });
+          }
+        }
+      }
+
+      // Sort: critical first; within each kind, date-specific before structural for urgency
+      issues.sort((a, b) => {
+        if (a.severity !== b.severity) return a.severity === "critical" ? -1 : 1;
+        if (a.kind !== b.kind) return a.kind === "date" ? -1 : 1;
+        if (a.eventDate && b.eventDate)
+          return new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime();
+        return a.roleName.localeCompare(b.roleName);
+      });
+
+      setCoverageIssues(issues);
 
       // --- Fetch data for reports ---
       if (!dateRange?.from || !dateRange?.to) {
@@ -434,6 +543,94 @@ export default function AdminDashboardPage() {
           </Card>
         </Link>
       </div>
+
+      {/* --- Coverage Warnings --- */}
+      {!loadingStats && coverageIssues.length > 0 && (() => {
+        const benchIssues = coverageIssues.filter((i) => i.kind === "bench");
+        const dateIssues = coverageIssues.filter((i) => i.kind === "date");
+        const hasCritical = coverageIssues.some((i) => i.severity === "critical");
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className={`h-5 w-5 ${hasCritical ? "text-destructive" : "text-amber-600"}`} />
+              <h2 className="text-xl font-semibold">Coverage Warnings</h2>
+              <Badge variant={hasCritical ? "destructive" : "warning"} className="ml-1">
+                {coverageIssues.length}
+              </Badge>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Upcoming event gaps */}
+              {dateIssues.length > 0 && (
+                <Card className={`border-l-4 ${dateIssues.some(i => i.severity === "critical") ? "border-l-destructive" : "border-l-amber-400"}`}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
+                      Upcoming Event Gaps
+                    </CardTitle>
+                    <CardDescription>Unfilled roles in the next 14 days with ≤ 1 available volunteer</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {dateIssues.map((issue, idx) => (
+                        <div key={idx} className="flex items-center justify-between gap-3 py-1 border-b last:border-0">
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate">{issue.roleName}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {issue.eventName} &middot; {format(new Date(issue.eventDate!), "EEE, MMM d")}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-sm font-semibold tabular-nums">
+                              {issue.qualifiedCount} available
+                            </span>
+                            <Badge variant={issue.severity === "critical" ? "destructive" : "warning"}>
+                              {issue.qualifiedCount === 0 ? "None" : issue.qualifiedCount}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Thin bench */}
+              {benchIssues.length > 0 && (
+                <Card className={`border-l-4 ${benchIssues.some(i => i.severity === "critical") ? "border-l-destructive" : "border-l-amber-400"}`}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="h-4 w-4 text-amber-600 shrink-0" />
+                      Thin Bench
+                    </CardTitle>
+                    <CardDescription>Role positions with few qualified volunteers overall</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {benchIssues.map((issue, idx) => (
+                        <div key={idx} className="flex items-center justify-between gap-3 py-1 border-b last:border-0">
+                          <p className="font-medium text-sm">{issue.roleName}</p>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-sm font-semibold tabular-nums">
+                              {issue.qualifiedCount} qualified
+                            </span>
+                            <Badge variant={issue.severity === "critical" ? "destructive" : "warning"}>
+                              {issue.severity === "critical" ? "Critical" : "Low"}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      <Link href="/dashboard/admin/volunteers" className="underline underline-offset-2">Approve volunteers</Link> or{" "}
+                      <Link href="/dashboard/admin/volunteers?tab=role-requests" className="underline underline-offset-2">review role requests</Link> to grow these teams.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* --- Reports Section --- */}
       <div className="space-y-4">

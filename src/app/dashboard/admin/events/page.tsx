@@ -21,6 +21,7 @@ import {
   where,
   orderBy,
   addDoc,
+  arrayUnion,
 } from "firebase/firestore";
 import {
   PlusCircle,
@@ -54,7 +55,7 @@ import {
   endOfWeek,
 } from "date-fns";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, normalizeVolunteerForScheduling } from "@/lib/utils";
 import { Card, CardDescription, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { DayPicker } from "react-day-picker";
 import { buttonVariants } from "@/components/ui/button";
@@ -247,12 +248,7 @@ export default function EventsPage() {
       return;
     }
     setPublishMonthLoading("Running auto-assigner...");
-    const plainVolunteers = volunteers.map((v) => {
-      const plainV: any = { ...v };
-      if (plainV.lastAssigned && typeof plainV.lastAssigned.toDate === "function") plainV.lastAssigned = plainV.lastAssigned.toDate().toISOString();
-      if (plainV.createdAt && typeof plainV.createdAt.toDate === "function") plainV.createdAt = plainV.createdAt.toDate().toISOString();
-      return plainV;
-    });
+    const plainVolunteers = volunteers.map(normalizeVolunteerForScheduling);
     const aiInput: AutoAssignInput = {
       events: publishMonthStatus.events.map((e) => ({ id: e.id, eventName: e.eventName, eventDate: e.eventDate, churchId: e.churchId, seriesId: e.seriesId })),
       allRoles: publishMonthStatus.roles as any,
@@ -287,8 +283,7 @@ export default function EventsPage() {
         });
         publishMonthPlan.userUpdates.forEach((u) => {
           batch.update(doc(firestore, "users", u.volunteerId), {
-            assignmentCount: u.newAssignmentCount,
-            lastAssigned: new Date(u.newLastAssigned).toISOString(),
+            assignmentHistory: arrayUnion(...u.newHistoryEntries),
           });
         });
       }

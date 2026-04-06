@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import qrcode from "qrcode";
+import sharp from "sharp";
 
 async function fetchImage(url: string): Promise<Buffer> {
   const response = await fetch(url);
@@ -31,8 +32,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       roles?: string[];
       signupUrl: string;
       primaryColor?: string;
+      heroImageDataUrl?: string;
+      heroImageUrl?: string;
     };
-    const { churchName, logoUrl, roles = [], signupUrl, primaryColor = "#000000" } = body;
+    const { churchName, logoUrl, roles = [], signupUrl, primaryColor = "#000000", heroImageDataUrl, heroImageUrl } = body;
 
     // --- PDF Creation ---
     const pdfDoc = await PDFDocument.create();
@@ -50,16 +53,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const secondaryTextColor = rgb(0.33, 0.33, 0.33);
 
     // --- Header Image ---
-    const headerImageUrl = "https://picsum.photos/seed/flyer1/1200/400";
-    const headerImageBytes = await fetchImage(headerImageUrl);
-    const headerImage = await pdfDoc.embedJpg(headerImageBytes);
-    const headerImageHeight = 180; // 2.5 inches
-    page.drawImage(headerImage, {
-      x: 0,
-      y: height - headerImageHeight,
-      width: width,
-      height: headerImageHeight,
-    });
+    let headerImageHeight = 0;
+    const resolvedHeroBytes: Buffer | undefined = heroImageDataUrl
+      ? Buffer.from(heroImageDataUrl.replace(/^data:image\/\w+;base64,/, ""), "base64")
+      : heroImageUrl
+        ? await fetchImage(heroImageUrl).catch(() => undefined)
+        : undefined;
+    if (resolvedHeroBytes) {
+      try {
+        // 300 DPI: 8.5" wide × 2.5" tall header = 2550×750 px (ratio 3.4:1 matching the PDF band)
+        const pngBytes = await sharp(resolvedHeroBytes)
+          .resize(2550, 750, { fit: "cover", position: "centre" })
+          .png()
+          .toBuffer();
+        const headerImage = await pdfDoc.embedPng(pngBytes);
+        headerImageHeight = 180;
+        page.drawImage(headerImage, {
+          x: 0,
+          y: height - headerImageHeight,
+          width: width,
+          height: headerImageHeight,
+        });
+      } catch {
+        // unsupported format — skip header image gracefully
+      }
+    }
 
     const contentPaddingX = 54; // 0.75 inch
     let currentY = height - headerImageHeight - 48;

@@ -8,17 +8,16 @@ import {
   useDoc,
   useCollection,
   useMemoFirebase,
-  errorEmitter,
 } from "@/firebase";
-import { FirestorePermissionError } from "@/firebase/errors";
 import {
   doc,
   collection,
   writeBatch,
-  serverTimestamp,
   query,
   where,
   getDocs,
+  arrayUnion,
+  arrayRemove,
   type DocumentReference,
   orderBy,
 } from "firebase/firestore";
@@ -28,7 +27,6 @@ import {
   CardTitle,
   CardContent,
   CardFooter,
-  CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,7 +55,7 @@ import { DateRange } from "react-day-picker";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
+import { cn, normalizeVolunteerForScheduling } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 
 // --- TYPES ---
@@ -90,8 +88,7 @@ interface Volunteer {
   email: string | null;
   availableRoleIds?: string[];
   availableServiceTemplateIds?: string[];
-  assignmentCount?: number;
-  lastAssigned?: any;
+  assignmentHistory?: { roleTemplateId: string; date: string }[];
   unavailability?: string[];
   servingPreference?: string;
   familyId?: string;
@@ -175,7 +172,7 @@ export default function ScheduleWizardPage() {
   
   const [rollbackPlan, setRollbackPlan] = useState<{
     roles: { roleRef: DocumentReference }[];
-    users: { userRef: DocumentReference; oldAssignmentCount: number; oldLastAssigned: any }[];
+    users: { userRef: DocumentReference; entriesToRemove: { roleTemplateId: string; date: string }[] }[];
   } | null>(null);
   const [isUndoing, setIsUndoing] = useState(false);
 
@@ -270,16 +267,7 @@ export default function ScheduleWizardPage() {
 
       toast.loading(`Found ${allUnassignedRoles.length} open roles. Running auto-assignment...`, { id: loadingToast });
 
-      const mappedVolunteers = volunteers.map((v) => {
-        const plainV: any = { ...v };
-        if (plainV.lastAssigned && typeof plainV.lastAssigned.toDate === "function") {
-          plainV.lastAssigned = plainV.lastAssigned.toDate().toISOString();
-        }
-        if (plainV.createdAt && typeof plainV.createdAt.toDate === "function") {
-          plainV.createdAt = plainV.createdAt.toDate().toISOString();
-        }
-        return plainV;
-      });
+      const mappedVolunteers = volunteers.map(normalizeVolunteerForScheduling);
 
       const mappedEvents = eventsToAssign.map((e) => {
         const plainE: any = { ...e };
@@ -327,7 +315,7 @@ export default function ScheduleWizardPage() {
     try {
       const batch = writeBatch(firestore);
       const rollbackRoles: { roleRef: DocumentReference }[] = [];
-      const rollbackUsers: { userRef: DocumentReference; oldAssignmentCount: number; oldLastAssigned: any }[] = [];
+      const rollbackUsers: { userRef: DocumentReference; entriesToRemove: { roleTemplateId: string; date: string }[] }[] = [];
 
       // Update roles
       assignmentPlan.assignments.forEach((assignment) => {
@@ -344,22 +332,13 @@ export default function ScheduleWizardPage() {
         rollbackRoles.push({ roleRef });
       });
 
-      // Update user stats
-      const volunteerMap = new Map(volunteers.map((v) => [v.id, v]));
+      // Update user assignment history (append new entries via arrayUnion)
       assignmentPlan.userUpdates.forEach((update) => {
         const userRef = doc(firestore, "users", update.volunteerId);
         batch.update(userRef, {
-          assignmentCount: update.newAssignmentCount,
-          lastAssigned: update.newLastAssigned,
+          assignmentHistory: arrayUnion(...update.newHistoryEntries),
         });
-        const v = volunteerMap.get(update.volunteerId);
-        if (v) {
-          rollbackUsers.push({
-            userRef,
-            oldAssignmentCount: v.assignmentCount || 0,
-            oldLastAssigned: v.lastAssigned || null,
-          });
-        }
+        rollbackUsers.push({ userRef, entriesToRemove: update.newHistoryEntries });
       });
       setRollbackPlan({ roles: rollbackRoles, users: rollbackUsers });
 
@@ -367,6 +346,7 @@ export default function ScheduleWizardPage() {
 
       // --- BATCH NOTIFICATION LOGIC ---
       if (isPublished && assignmentPlan.assignments.length > 0) {
+        const volunteerMap = new Map(volunteers.map((v) => [v.id, v]));
         const notifications = new Map<string, { recipientName: string; assignments: any[] }>();
 
         for (const assignment of assignmentPlan.assignments) {
@@ -440,8 +420,7 @@ export default function ScheduleWizardPage() {
       });
       rollbackPlan.users.forEach((u) => {
         batch.update(u.userRef, {
-          assignmentCount: u.oldAssignmentCount,
-          lastAssigned: u.oldLastAssigned,
+          assignmentHistory: arrayRemove(...u.entriesToRemove),
         });
       });
       await batch.commit();

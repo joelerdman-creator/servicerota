@@ -1,6 +1,6 @@
 "use server";
 
-import type { AutoAssignInput, AssignmentPlan } from "./types";
+import type { AutoAssignInput, AssignmentPlan, AssignmentHistoryEntry } from "./types";
 
 export async function autoAssignVolunteers(
   input: AutoAssignInput,
@@ -14,28 +14,36 @@ export async function autoAssignVolunteers(
 //
 // Priority order when selecting a volunteer for a role:
 //   1. Hard constraints (blocks assignment entirely):
-//      a. Already assigned to this event in this run
+//      a. Already assigned to this event in this run (removed from pool)
 //      b. Does not hold the required role qualification
 //      c. Marked unavailable on the event date
 //      d. Has service-series preferences that exclude this series
 //      e. servingPreference = ONLY_WITH_FAMILY and no family member is
 //         scheduled at this event
 //
-//   2. Soft scoring (higher = higher priority):
-//      base = -assignmentCount * 10  +  daysSinceLastAssigned
-//           (never-assigned volunteers receive +365 bonus)
-//      family bonus: +50 if servingPreference = PREFER_FAMILY and a family
-//         member is already scheduled for this event
+//   2. Soft scoring (higher = higher priority), evaluated per-role:
+//      Looks at the volunteer's assignment history for this specific role
+//      within a rolling 6-month window:
+//        score = -(roleCount6Mo × 10) + daysSinceLastRoleAssignment
+//      If never assigned to this role in the window: daysSince = 180
+//      Family bonus: +20 if servingPreference = PREFER_FAMILY and a family
+//        member is already scheduled for this event
 //
 // Role ordering within an event:
 //   Roles are sorted by the number of qualified volunteers ASCENDING so the
 //   hardest-to-fill roles are attempted first (scarcity-first).
 //
-// Family tracking:
-//   familyAssignedToEvent tracks which familyIds have at least one member
-//   assigned to each event. It is seeded from pre-existing assignments and
-//   updated dynamically as this run assigns new volunteers.
+// Per-role re-scoring:
+//   The volunteer pool is re-sorted for each role within an event, using
+//   that role's specific scoring. This ensures a volunteer with heavy Lector
+//   history isn't deprioritized for an Usher slot they rarely fill.
+//
+// Cross-event fairness:
+//   In-memory history is updated after each assignment, so later events in
+//   a batch run reflect assignments already made in the same run.
 // ---------------------------------------------------------------------------
+
+const SIX_MONTHS_MS = 180 * 24 * 60 * 60 * 1000;
 
 export async function deterministicAutoAssign(
   input: AutoAssignInput,
@@ -48,7 +56,6 @@ export async function deterministicAutoAssign(
 
   const { volunteers, roleTemplates } = input;
 
-  // All roles that still need filling
   const allUnassignedRoles = (input.allRoles || []).filter(
     (r) => !r.assignedVolunteerId,
   );
@@ -84,49 +91,59 @@ export async function deterministicAutoAssign(
       }
     });
 
-  // Mutable stats updated as assignments are made (so later events use
-  // up-to-date fairness data).
-  const userStats = new Map<
-    string,
-    { assignmentCount: number; lastAssigned?: string }
-  >();
+  // Mutable per-volunteer assignment history — updated as assignments are made
+  // so later events (and later roles within an event) score against up-to-date data.
+  const userStats = new Map<string, { assignmentHistory: AssignmentHistoryEntry[] }>();
   volunteers.forEach((v) => {
     userStats.set(v.id, {
-      assignmentCount: v.assignmentCount || 0,
-      lastAssigned: v.lastAssigned,
+      assignmentHistory: v.assignmentHistory ? [...v.assignmentHistory] : [],
     });
   });
 
+  // Track new entries added this run (collected for userUpdates output)
+  const newHistoryEntries = new Map<string, AssignmentHistoryEntry[]>();
+
   // ----- Scoring -----------------------------------------------------------
 
-  const getBaseScore = (volunteerId: string): number => {
+  const now = Date.now();
+  const cutoffMs = now - SIX_MONTHS_MS;
+
+  // Score a volunteer for a specific role using the 6-month rolling window.
+  const getRoleScore = (volunteerId: string, roleTemplateId: string): number => {
     const stats = userStats.get(volunteerId);
     if (!stats) return -Infinity;
-    let score = -(stats.assignmentCount * 10);
-    if (stats.lastAssigned) {
-      const daysSince =
-        (Date.now() - new Date(stats.lastAssigned).getTime()) /
-        (1000 * 3600 * 24);
-      score += daysSince;
+
+    const roleHistory = stats.assignmentHistory.filter(
+      (h) =>
+        h.roleTemplateId === roleTemplateId &&
+        new Date(h.date).getTime() >= cutoffMs,
+    );
+
+    const count = roleHistory.length;
+    let daysSince: number;
+    if (roleHistory.length > 0) {
+      const lastMs = Math.max(...roleHistory.map((h) => new Date(h.date).getTime()));
+      daysSince = (now - lastMs) / (1000 * 3600 * 24);
     } else {
-      score += 365; // never-assigned bonus
+      // No history for this role in the window — treat as if last served the
+      // full window ago, giving them equal footing with others at zero count.
+      daysSince = 180;
     }
-    return score;
+
+    return -(count * 10) + daysSince;
   };
 
   const getFairnessScore = (
     volunteer: (typeof volunteers)[number],
     eventId: string,
+    roleTemplateId: string,
   ): number => {
-    let score = getBaseScore(volunteer.id);
+    let score = getRoleScore(volunteer.id, roleTemplateId);
 
-    // Family preference bonus
-    if (
-      volunteer.familyId &&
-      volunteer.servingPreference === "PREFER_FAMILY"
-    ) {
+    // Family preference bonus — reduced to +20 (≈ 20 days of recency)
+    if (volunteer.familyId && volunteer.servingPreference === "PREFER_FAMILY") {
       if (familyAssignedToEvent.get(eventId)?.has(volunteer.familyId)) {
-        score += 50;
+        score += 20;
       }
     }
 
@@ -135,8 +152,6 @@ export async function deterministicAutoAssign(
 
   // ----- Scarcity helper --------------------------------------------------
 
-  // Count volunteers eligible for a given role/event combination.
-  // Used to sort roles within an event so scarce roles are filled first.
   const countEligible = (
     roleName: string,
     eventDateStr: string,
@@ -163,12 +178,9 @@ export async function deterministicAutoAssign(
   const unassignedRoleIds = new Set(allUnassignedRoles.map((r) => r.id));
 
   for (const event of eventList) {
-    const eventDateStr = new Date(event.eventDate)
-      .toISOString()
-      .split("T")[0];
+    const eventDateStr = new Date(event.eventDate).toISOString().split("T")[0];
     const eventSeriesId = event.seriesId;
 
-    // Roles for this event that still need filling
     const rolesForThisEvent = allUnassignedRoles.filter(
       (r) => r.eventId === event.id && unassignedRoleIds.has(r.id),
     );
@@ -176,22 +188,15 @@ export async function deterministicAutoAssign(
     if (rolesForThisEvent.length === 0) continue;
 
     // Sort roles by scarcity: fewest qualified volunteers first.
-    // This ensures hard-to-fill roles are attempted before the volunteer
-    // pool is depleted by easier roles.
     rolesForThisEvent.sort(
       (a, b) =>
         countEligible(a.roleName, eventDateStr, eventSeriesId) -
         countEligible(b.roleName, eventDateStr, eventSeriesId),
     );
 
-    // Fresh volunteer pool for this event, sorted by fairness score
-    const eventPool = [...volunteers].sort(
-      (a, b) =>
-        getFairnessScore(b, event.id) - getFairnessScore(a, event.id),
-    );
-
-    // Track who has been assigned in this event (one role per volunteer per event)
-    const assignedThisEvent = new Set<string>();
+    // Mutable pool of remaining volunteers for this event.
+    // Volunteers are removed as they are assigned (one role per volunteer per event).
+    const eventPool = [...volunteers];
 
     for (const role of rolesForThisEvent) {
       const normalizedRoleName = role.roleName.trim().toLowerCase();
@@ -204,48 +209,45 @@ export async function deterministicAutoAssign(
         continue;
       }
 
+      // Re-sort the remaining pool specifically for this role's scoring.
+      // This is the key difference from a single per-event sort: a volunteer
+      // with heavy Lector history won't be penalised when scoring for Usher.
+      const sortedPool = [...eventPool].sort(
+        (a, b) =>
+          getFairnessScore(b, event.id, roleTemplateId) -
+          getFairnessScore(a, event.id, roleTemplateId),
+      );
+
       let filled = false;
-      // Track why the last candidate was rejected (for diagnostics)
-      let lastRejectReason =
-        "No volunteers are qualified for this role.";
+      let lastRejectReason = "No volunteers are qualified for this role.";
 
-      for (let i = 0; i < eventPool.length; i++) {
-        const v = eventPool[i];
-
-        // A. Already assigned to this event
-        if (assignedThisEvent.has(v.id)) continue;
-
-        // B. Role qualification
+      for (const v of sortedPool) {
+        // A. Role qualification
         if (!v.availableRoleIds?.includes(roleTemplateId)) {
           lastRejectReason = "No available volunteers are qualified for this role.";
           continue;
         }
 
-        // C. Unavailability
+        // B. Unavailability
         if (v.unavailability?.includes(eventDateStr)) {
           lastRejectReason = "All qualified volunteers are unavailable on this date.";
           continue;
         }
 
-        // D. Service series preference
+        // C. Service series preference
         if (
           eventSeriesId &&
           v.availableRecurringEventSeriesIds &&
           v.availableRecurringEventSeriesIds.length > 0 &&
           !v.availableRecurringEventSeriesIds.includes(eventSeriesId)
         ) {
-          lastRejectReason =
-            "All qualified volunteers prefer a different service time.";
+          lastRejectReason = "All qualified volunteers prefer a different service time.";
           continue;
         }
 
-        // E. Family constraint (hard block)
+        // D. Family constraint (hard block)
         if (v.servingPreference === "ONLY_WITH_FAMILY") {
-          if (!v.familyId) {
-            // No family defined — treat as no constraint
-          } else if (
-            !familyAssignedToEvent.get(event.id)?.has(v.familyId)
-          ) {
+          if (v.familyId && !familyAssignedToEvent.get(event.id)?.has(v.familyId)) {
             lastRejectReason = `${v.firstName} only serves with family members, and none are scheduled for this event yet.`;
             continue;
           }
@@ -260,11 +262,10 @@ export async function deterministicAutoAssign(
           volunteerName: `${v.firstName} ${v.lastName}`,
         });
 
-        assignedThisEvent.add(v.id);
         unassignedRoleIds.delete(role.id);
 
-        // Update family tracking so subsequent roles in this event can
-        // benefit from the PREFER_FAMILY / ONLY_WITH_FAMILY logic.
+        // Update family tracking so subsequent roles in this event benefit from
+        // PREFER_FAMILY / ONLY_WITH_FAMILY logic.
         if (v.familyId) {
           if (!familyAssignedToEvent.has(event.id)) {
             familyAssignedToEvent.set(event.id, new Set());
@@ -272,15 +273,18 @@ export async function deterministicAutoAssign(
           familyAssignedToEvent.get(event.id)!.add(v.familyId);
         }
 
-        // Update in-memory stats for future fairness scoring
-        const stats = userStats.get(v.id);
-        if (stats) {
-          stats.assignmentCount++;
-          stats.lastAssigned = new Date(event.eventDate).toISOString();
-        }
+        // Update in-memory history so later roles/events score correctly.
+        const entry: AssignmentHistoryEntry = { roleTemplateId, date: eventDateStr };
+        userStats.get(v.id)!.assignmentHistory.push(entry);
 
-        // Remove from pool so they can't fill a second role this event
-        eventPool.splice(i, 1);
+        // Accumulate new entries for the userUpdates output.
+        if (!newHistoryEntries.has(v.id)) newHistoryEntries.set(v.id, []);
+        newHistoryEntries.get(v.id)!.push(entry);
+
+        // Remove from event pool — each volunteer fills at most one role per event.
+        const idx = eventPool.findIndex((p) => p.id === v.id);
+        if (idx !== -1) eventPool.splice(idx, 1);
+
         filled = true;
         break;
       }
@@ -296,19 +300,8 @@ export async function deterministicAutoAssign(
   // ----- Build user update list -------------------------------------------
 
   const userUpdates: AssignmentPlan["userUpdates"] = [];
-  userStats.forEach((stats, volunteerId) => {
-    const original = volunteers.find((v) => v.id === volunteerId);
-    if (
-      original &&
-      (original.assignmentCount !== stats.assignmentCount ||
-        original.lastAssigned !== stats.lastAssigned)
-    ) {
-      userUpdates.push({
-        volunteerId,
-        newAssignmentCount: stats.assignmentCount,
-        newLastAssigned: stats.lastAssigned || new Date().toISOString(),
-      });
-    }
+  newHistoryEntries.forEach((entries, volunteerId) => {
+    userUpdates.push({ volunteerId, newHistoryEntries: entries });
   });
 
   // ----- Reasoning string -------------------------------------------------
@@ -317,7 +310,7 @@ export async function deterministicAutoAssign(
     (r) => !r.assignedVolunteerId,
   ).length;
 
-  let reasoning = `Assigned ${assignments.length} of ${totalOpen} open roles using fairness scoring (balances assignment count and time since last served).`;
+  let reasoning = `Assigned ${assignments.length} of ${totalOpen} open roles using per-role fairness scoring (6-month rolling window: balances role-specific serving count and recency).`;
 
   if (unassignedReasons.length > 0) {
     const shown = unassignedReasons.slice(0, 10);

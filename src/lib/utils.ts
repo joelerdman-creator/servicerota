@@ -5,6 +5,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Strips Firestore-specific types from a volunteer object before passing it to
+ * a server action or scheduling engine. Converts Timestamp fields to ISO strings
+ * and ensures assignmentHistory defaults to [].
+ */
+export function normalizeVolunteerForScheduling<T extends Record<string, any>>(v: T): T {
+  const out: any = { ...v };
+  if (out.createdAt && typeof out.createdAt.toDate === "function") {
+    out.createdAt = out.createdAt.toDate().toISOString();
+  }
+  out.assignmentHistory = Array.isArray(out.assignmentHistory) ? out.assignmentHistory : [];
+  return out as T;
+}
+
 export function getServiceColor(serviceId: string) {
   const colors = [
     "bg-stone-100 text-stone-700 hover:bg-stone-100 dark:bg-stone-900/30 dark:text-stone-300",

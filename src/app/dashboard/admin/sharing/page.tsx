@@ -143,6 +143,7 @@ interface ChurchProfile {
   logoUrl?: string;
   primaryColor?: string;
   fontFamily?: string;
+  denomination?: string;
 }
 interface Event {
   eventName: string;
@@ -186,6 +187,7 @@ const FlyerContent = ({
   primaryColor,
   fontFamily,
   flyerImageUrl,
+  defaultHeroImageUrl,
 }: {
   churchProfile: ChurchProfile | null;
   selectedRoles: Set<string>;
@@ -194,12 +196,15 @@ const FlyerContent = ({
   primaryColor: string;
   fontFamily: string;
   flyerImageUrl?: string;
-}) => (
+  defaultHeroImageUrl?: string;
+}) => {
+  const activeHeroImage = flyerImageUrl || defaultHeroImageUrl;
+  return (
   <div className="flyer-body" style={{ fontFamily }}>
     <div className="flyer-top-image-container">
-      {flyerImageUrl ? (
+      {activeHeroImage ? (
         <img
-          src={flyerImageUrl}
+          src={activeHeroImage}
           alt="Church community hero image"
           className="flyer-top-image"
         />
@@ -258,7 +263,8 @@ const FlyerContent = ({
       <p className="web-address">{signupUrl.replace(/^https?:\/\//, "")}</p>
     </div>
   </div>
-);
+  );
+};
 
 function NotificationsTab() {
   const { user } = useUser();
@@ -421,12 +427,14 @@ export default function SharingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedFlyerRoles, setSelectedFlyerRoles] = useState<Set<string>>(new Set());
   const [flyerImageUrl, setFlyerImageUrl] = useState<string | undefined>();
+  const [selectedStockImageUrl, setSelectedStockImageUrl] = useState<string | undefined>();
 
   const handleFlyerImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setFlyerImageUrl(URL.createObjectURL(file));
-    }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setFlyerImageUrl(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
   useEffect(() => setBaseUrl(window.location.origin), []);
@@ -447,7 +455,20 @@ export default function SharingPage() {
     ),
   );
 
-  useEffect(() => {
+  const { data: stockHeroImages } = useCollection<{ url: string; role: string; denominationCluster: string }>(
+    useMemoFirebase(
+      () =>
+        firestore
+          ? query(
+              collection(firestore, "graphic_assets"),
+              where("role", "==", "flyer_hero")
+            )
+          : null,
+      [firestore]
+    )
+  );
+  
+useEffect(() => {
     if (churchProfile?.name) setWidgetTitle(churchProfile.name);
     if (churchProfile?.primaryColor) setWidgetPrimaryColor(churchProfile.primaryColor);
     if (churchProfile?.fontFamily) setWidgetFont(churchProfile.fontFamily);
@@ -624,6 +645,8 @@ export default function SharingPage() {
         roles: Array.from(selectedFlyerRoles),
         signupUrl: signupUrl,
         primaryColor: churchProfile.primaryColor || "#15803d",
+        heroImageDataUrl: flyerImageUrl,
+        heroImageUrl: flyerImageUrl ? undefined : selectedStockImageUrl,
       };
       const response = await fetch("/api/generate-flyer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(flyerData) });
       if (!response.ok) { throw new Error((await response.text()) || "Failed to generate PDF"); }
@@ -820,34 +843,59 @@ export default function SharingPage() {
               <CardHeader><CardTitle>Volunteer Recruitment Flyer</CardTitle><CardDescription>Customize and print a flyer to recruit new volunteers for your church.</CardDescription></CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="md:col-span-1 space-y-6">
-                  <div>
+                  <div className="mb-6 space-y-3">
                     <Label className="text-base">Hero Image</Label>
-                    <p className="text-sm text-muted-foreground mb-2">Upload a photo for the top of the flyer.</p>
-                    <div className="flex flex-col gap-2">
-                      <label
-                        htmlFor="flyer-image-upload"
-                        className="flex items-center justify-center gap-2 cursor-pointer border-2 border-dashed rounded-md p-4 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
-                      >
-                        <Download className="h-4 w-4 rotate-180" />
-                        {flyerImageUrl ? "Replace image" : "Upload image"}
-                        <input
-                          id="flyer-image-upload"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleFlyerImageUpload}
-                        />
-                      </label>
-                      {flyerImageUrl && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs text-muted-foreground"
-                          onClick={() => setFlyerImageUrl(undefined)}
+                    {stockHeroImages && stockHeroImages.length > 0 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-2">Choose a stock photo:</p>
+                        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
+                          {stockHeroImages.map((img) => (
+                            <button
+                              key={img.id}
+                              type="button"
+                              onClick={() => { setSelectedStockImageUrl(img.url); setFlyerImageUrl(undefined); }}
+                              style={{ aspectRatio: "612 / 180" }}
+                              className={cn(
+                                "relative shrink-0 w-32 rounded-md overflow-hidden border-2 snap-start transition-colors",
+                                selectedStockImageUrl === img.url && !flyerImageUrl
+                                  ? "border-brand-accent"
+                                  : "border-transparent hover:border-muted-foreground/40"
+                              )}
+                            >
+                              <Image src={img.url} alt={img.denominationCluster ?? "Stock photo"} fill className="object-cover" unoptimized />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Or upload your own (wide landscape, 16:9 recommended):</p>
+                      <div className="flex flex-col gap-2">
+                        <label
+                          htmlFor="flyer-image-upload"
+                          className="flex items-center justify-center gap-2 cursor-pointer border-2 border-dashed rounded-md p-4 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
                         >
-                          Remove image
-                        </Button>
-                      )}
+                          <Download className="h-4 w-4 rotate-180" />
+                          {flyerImageUrl ? "Replace upload" : "Upload image"}
+                          <input
+                            id="flyer-image-upload"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleFlyerImageUpload}
+                          />
+                        </label>
+                        {flyerImageUrl && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-muted-foreground"
+                            onClick={() => setFlyerImageUrl(undefined)}
+                          >
+                            Remove upload
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div>
@@ -861,7 +909,7 @@ export default function SharingPage() {
                 <div className="md:col-span-2">
                   <Label className="text-base">Flyer Preview</Label>
                   <div ref={previewWrapperRef} className="mt-2 w-full overflow-hidden rounded-lg border bg-slate-200" style={{ aspectRatio: `${FLYER_ASPECT_RATIO}` }}>
-                    <div style={{ transform: `scale(${scaleFactor})`, transformOrigin: "top left" }}><FlyerContent churchProfile={churchProfile} selectedRoles={selectedFlyerRoles} signupUrl={signupUrl} logoDataUrl={logoDataUrl} primaryColor={churchProfile?.primaryColor || "#15803d"} fontFamily={churchProfile?.fontFamily || "Inter"} /></div>
+                    <div style={{ transform: `scale(${scaleFactor})`, transformOrigin: "top left" }}><FlyerContent churchProfile={churchProfile} selectedRoles={selectedFlyerRoles} signupUrl={signupUrl} logoDataUrl={logoDataUrl} primaryColor={churchProfile?.primaryColor || "#15803d"} fontFamily={churchProfile?.fontFamily || "Inter"} flyerImageUrl={flyerImageUrl} defaultHeroImageUrl={selectedStockImageUrl} /></div>
                   </div>
                 </div>
               </CardContent>

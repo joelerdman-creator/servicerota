@@ -1,32 +1,47 @@
 
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useFirestore, WithId, useAuth, useUser } from "@/firebase";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useSearchParams } from "next/navigation";
 import {
   collection,
   query,
-  doc,
   getDocs,
   limit,
   startAfter,
   orderBy,
   where,
   DocumentSnapshot,
-  endBefore,
-  limitToLast,
 } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search, Shield, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Shield, Loader2, ChevronLeft, ChevronRight, Building2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { signInWithCustomToken } from "firebase/auth";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface User {
   id: string;
@@ -44,10 +59,16 @@ interface UserWithClaims extends WithId<User> {
 
 const PAGE_SIZE = 15;
 
+interface ChurchOption {
+  id: string;
+  name: string;
+}
+
 export default function SuperUserUsersPage() {
   const firestore = useFirestore();
   const auth = useAuth();
   const { user: superUser } = useUser();
+  const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
@@ -56,6 +77,9 @@ export default function SuperUserUsersPage() {
   const [page, setPage] = useState(1);
   const [firstDoc, setFirstDoc] = useState<DocumentSnapshot | null>(null);
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
+  const [pendingClaimChange, setPendingClaimChange] = useState<{ uid: string; name: string; grant: boolean } | null>(null);
+  const [churches, setChurches] = useState<ChurchOption[]>([]);
+  const [selectedChurchId, setSelectedChurchId] = useState<string>(searchParams.get("churchId") ?? "");
 
   const fetchUsers = useCallback(async (direction: 'next' | 'prev' | 'search' = 'search') => {
     if (!firestore) return;
@@ -66,8 +90,10 @@ export default function SuperUserUsersPage() {
       let q;
 
       const baseConstraints = [
-        where("email", ">=", debouncedSearchTerm),
-        where("email", "<=", debouncedSearchTerm + "\uf8ff")
+        ...(selectedChurchId ? [where("churchId", "==", selectedChurchId)] : [
+          where("email", ">=", debouncedSearchTerm),
+          where("email", "<=", debouncedSearchTerm + "\uf8ff"),
+        ]),
       ];
 
       if (direction === 'next' && lastDoc) {
@@ -85,8 +111,28 @@ export default function SuperUserUsersPage() {
         fetchedUsers.reverse(); // Reverse to maintain correct order
       }
       
+      // Hydrate real superUser claims from Admin SDK
+      if (fetchedUsers.length > 0) {
+        try {
+          const res = await fetch("/api/auth/get-claims", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uids: fetchedUsers.map((u) => u.id) }),
+          });
+          if (res.ok) {
+            const { results } = await res.json() as { results: { uid: string; claims: Record<string, unknown> }[] };
+            const claimsMap = Object.fromEntries(results.map((r) => [r.uid, r.claims]));
+            fetchedUsers.forEach((u) => {
+              u.isSuperUser = claimsMap[u.id]?.superUser === true;
+            });
+          }
+        } catch {
+          // non-fatal — badges just won't show until next load
+        }
+      }
+
       setUsers(fetchedUsers);
-      
+
       if (querySnapshot.docs.length > 0) {
         setFirstDoc(querySnapshot.docs[0]);
         setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
@@ -101,15 +147,23 @@ export default function SuperUserUsersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [firestore, lastDoc, firstDoc, debouncedSearchTerm]);
+  }, [firestore, lastDoc, firstDoc, debouncedSearchTerm, selectedChurchId]);
 
+
+  // Load church list for filter dropdown
+  useEffect(() => {
+    if (!firestore) return;
+    getDocs(query(collection(firestore, "churches"), orderBy("name"))).then((snap) => {
+      setChurches(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id })));
+    });
+  }, [firestore]);
 
   useEffect(() => {
     setPage(1);
     setFirstDoc(null);
     setLastDoc(null);
     fetchUsers('search');
-  }, [debouncedSearchTerm, firestore]);
+  }, [debouncedSearchTerm, selectedChurchId, firestore]);
 
   const handleNextPage = () => {
     if (lastDoc) {
@@ -168,26 +222,35 @@ export default function SuperUserUsersPage() {
     }
   };
 
-  const handleClaimChange = async (targetUid: string, hasClaim: boolean) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === targetUid ? { ...u, isSuperUser: hasClaim } : u)),
-    );
+  const handleClaimChange = (targetUid: string, grant: boolean) => {
+    const targetUser = users.find((u) => u.id === targetUid);
+    if (!targetUser) return;
+    setPendingClaimChange({
+      uid: targetUid,
+      name: `${targetUser.firstName} ${targetUser.lastName}`,
+      grant,
+    });
+  };
+
+  const confirmClaimChange = async () => {
+    if (!pendingClaimChange) return;
+    const { uid, grant } = pendingClaimChange;
+    setPendingClaimChange(null);
+    setUsers((prev) => prev.map((u) => (u.id === uid ? { ...u, isSuperUser: grant } : u)));
     try {
-      const response = await fetch(`/api/auth/set-claim`, {
+      const response = await fetch("/api/auth/set-claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetUid, claim: "superUser", value: hasClaim }),
+        body: JSON.stringify({ targetUid: uid, claim: "superUser", value: grant }),
       });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to set claim.");
       }
-      toast.success(`Super User status ${hasClaim ? "granted" : "revoked"}.`);
+      toast.success(`Super User status ${grant ? "granted" : "revoked"}.`);
     } catch (error: any) {
       toast.error(`Failed to update claim: ${error.message}`);
-      setUsers((prev) =>
-        prev.map((u) => (u.id === targetUid ? { ...u, isSuperUser: !hasClaim } : u)),
-      );
+      setUsers((prev) => prev.map((u) => (u.id === uid ? { ...u, isSuperUser: !grant } : u)));
     }
   };
 
@@ -203,17 +266,40 @@ export default function SuperUserUsersPage() {
           <CardDescription>
             {isLoading ? "Loading users..." : `Showing page ${page}.`}
           </CardDescription>
-          <form onSubmit={(e) => e.preventDefault()} className="flex gap-2 pt-2">
+          <div className="flex flex-col sm:flex-row gap-2 pt-2">
             <div className="relative flex-grow">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by email..."
+                placeholder={selectedChurchId ? "Search within church..." : "Search by email..."}
                 className="pl-9"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                disabled={!!selectedChurchId}
               />
             </div>
-          </form>
+            <div className="flex items-center gap-2 shrink-0">
+              <Building2 className="h-4 w-4 text-muted-foreground hidden sm:block" />
+              <Select
+                value={selectedChurchId || "__all__"}
+                onValueChange={(v) => setSelectedChurchId(v === "__all__" ? "" : v)}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="All churches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All churches</SelectItem>
+                  {churches.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedChurchId && (
+                <Button variant="ghost" size="icon" onClick={() => setSelectedChurchId("")} title="Clear filter">
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="border rounded-md">
@@ -279,6 +365,30 @@ export default function SuperUserUsersPage() {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!pendingClaimChange} onOpenChange={(open) => { if (!open) setPendingClaimChange(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingClaimChange?.grant ? "Grant Super User access?" : "Revoke Super User access?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingClaimChange?.grant
+                ? `${pendingClaimChange.name} will have full platform administration access. This cannot be undone without another Super User.`
+                : `${pendingClaimChange?.name} will immediately lose all Super User privileges.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmClaimChange}
+              className={pendingClaimChange?.grant ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+            >
+              {pendingClaimChange?.grant ? "Grant access" : "Revoke access"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

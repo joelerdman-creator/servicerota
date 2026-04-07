@@ -17,6 +17,7 @@ import { doc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import toast from "react-hot-toast";
 import { useState, useEffect } from "react";
+import { ImpersonationBanner } from "@/components/impersonation-banner";
 
 interface UserProfile {
   isAdmin?: boolean;
@@ -68,6 +69,7 @@ export default function VolunteerLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex flex-col min-h-screen">
+      <ImpersonationBanner />
       <header className="bg-nav text-nav-foreground shadow-md sticky top-0 z-30">
         <div className="container mx-auto px-4 lg:px-8 h-16 flex items-center justify-between">
           <Link

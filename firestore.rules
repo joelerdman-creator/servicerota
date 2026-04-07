@@ -48,6 +48,7 @@ service cloud.firestore {
     match /churches/{churchId} {
       // Public get for widget/embed pages; subscription fields (planId, etc.) are non-sensitive
       allow get: if true;
+      allow list: if isSuperUser();
       allow create: if isSuperUser() || (isSignedIn() && request.resource.data.ownerId == request.auth.uid);
       // Only admins can update — protects planId, stripeCustomerId, etc. from client tampering
       allow update: if isSuperUser() || isChurchAdmin(churchId);
@@ -139,7 +140,7 @@ service cloud.firestore {
     // Global stock images used in church flyer/sharing pages.
     // Writes are server-side only (Admin SDK); client reads limited to signed-in admins.
     match /graphic_assets/{assetId} {
-      allow read: if isSuperUser() ||
+      allow get, list: if isSuperUser() ||
         (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
       allow write: if isSuperUser();
     }
@@ -148,7 +149,7 @@ service cloud.firestore {
     match /support_tickets/{ticketId} {
       allow create: if isSignedIn() && request.resource.data.submittedByUid == request.auth.uid;
       allow get: if isSuperUser() || (isSignedIn() && resource.data.submittedByUid == request.auth.uid);
-      allow list: if isSuperUser() || isSignedIn();
+      allow list: if isSuperUser() || (isSignedIn() && resource.data.submittedByUid == request.auth.uid) || isChurchAdmin(resource.data.churchId);
       allow update: if isSuperUser() || 
                     (isSignedIn() && resource.data.submittedByUid == request.auth.uid && 
                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'lastActivityAt']));

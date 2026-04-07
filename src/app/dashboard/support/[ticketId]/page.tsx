@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useFirestore, useUser, useDoc, useCollection, useMemoFirebase } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
@@ -69,9 +69,15 @@ export default function TicketDetailsPage() {
 
   const [newComment, setNewComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuperUser, setIsSuperUser] = useState(false);
 
-  // Determine if current user is a super user
-  const isSuperUser = user?.email === "joelerdman@gmail.com";
+  // Determine if current user is a super user via custom claim
+  useEffect(() => {
+    if (!user) return;
+    user.getIdTokenResult().then((tokenResult) => {
+      setIsSuperUser(Boolean(tokenResult.claims.superUser));
+    });
+  }, [user]);
 
   // --- DATA FETCHING ---
   const ticketDocRef = useMemoFirebase(

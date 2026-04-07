@@ -39,6 +39,7 @@ import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { doc } from "firebase/firestore";
 import { MODULES } from "@/config/modules";
+import { ImpersonationBanner } from "@/components/impersonation-banner";
 
 interface UserProfile {
   isAdmin?: boolean;
@@ -157,6 +158,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex flex-col min-h-screen">
+      <ImpersonationBanner />
       {/* Top Header / "Blue Bar" */}
       <header className="bg-nav text-nav-foreground shadow-md sticky top-0 z-30">
         <div className="container mx-auto px-4 lg:px-8 h-16 flex items-center justify-between">

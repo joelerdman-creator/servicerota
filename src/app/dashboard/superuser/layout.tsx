@@ -10,6 +10,8 @@ import {
   Repeat,
   Home,
   Menu,
+  Building2,
+  ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,8 +37,10 @@ import { useState, useEffect } from "react";
 
 const navItems = [
   { href: "/dashboard/superuser", icon: Home, label: "Dashboard" },
-  { href: "/dashboard/superuser/users", icon: Users, label: "Global Users" },
-  { href: "/dashboard/superuser/tickets", icon: LifeBuoy, label: "Support Tickets" },
+  { href: "/dashboard/superuser/churches", icon: Building2, label: "Churches" },
+  { href: "/dashboard/superuser/users", icon: Users, label: "Users" },
+  { href: "/dashboard/superuser/tickets", icon: LifeBuoy, label: "Support" },
+  { href: "/dashboard/superuser/assets", icon: ImageIcon, label: "Assets" },
 ];
 
 export default function SuperUserLayout({ children }: { children: React.ReactNode }) {

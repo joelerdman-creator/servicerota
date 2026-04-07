@@ -1,0 +1,86 @@
+{
+  "denomination_clusters": {
+    "Liturgical": "traditional architecture, ancient ecclesiastical elements, glowing candlelight, subtle incense haze, stained glass illumination, formal and reverent atmosphere",
+    "Mainline": "classic warm sanctuary, rich wood tones, dignified and familiar community atmosphere, pews and natural daylight",
+    "Evangelical": "modern worship auditorium, clean environment, engaging atmosphere, well-lit, contemporary staging",
+    "Charismatic": "expressive dynamic environment, high energy, raised hands, dynamic movement, vibrant and passionate atmosphere",
+    "Modern_Neutral": "neutral modern gathering space, minimalistic, bright, clear lighting, informal but intentional",
+    "LDS": "clean well-lit chapel, simple dignified decor, quiet reverence, community gathering"
+  },
+  "denomination_mapping": {
+    "Catholic": "Liturgical",
+    "Catholic (Ordinariate)": "Liturgical",
+    "Episcopal/Anglican": "Liturgical",
+    "Anglican (ACNA)": "Liturgical",
+    "Orthodox (Eastern)": "Liturgical",
+    "Orthodox (Greek)": "Liturgical",
+    "Orthodox (Russian)": "Liturgical",
+    
+    "Lutheran": "Mainline",
+    "Lutheran (ELCA)": "Mainline",
+    "Methodist": "Mainline",
+    "United Methodist": "Mainline",
+    "Presbyterian": "Mainline",
+    "Presbyterian (PCUSA)": "Mainline",
+    
+    "Lutheran (LCMS)": "Evangelical",
+    "Presbyterian (PCA)": "Evangelical",
+    "Baptist": "Evangelical",
+    "Southern Baptist": "Evangelical",
+    "Churches of Christ": "Evangelical",
+    
+    "Pentecostal": "Charismatic",
+    "Assemblies of God": "Charismatic",
+    
+    "Non-denominational": "Modern_Neutral",
+    "Other": "Modern_Neutral",
+    
+    "Mormon (LDS)": "LDS"
+  },
+  "roles": {
+    "Music/Worship": "group of musicians playing instruments and singing passionately on a gently elevated platform",
+    "Cantor": "soloist singing beautifully with focus",
+    "Choir Member": "group of diverse singers in harmonized unity",
+    "Worship Team": "contemporary musicians playing guitars and keyboards with engaging expression",
+    
+    "Hospitality": "welcoming figures smiling authentically near broad wooden doors, offering handshakes and warm greetings",
+    "Greeter": "welcoming figures smiling authentically near broad wooden doors, offering handshakes and warm greetings",
+    "Welcome Desk": "friendly person standing at an organized information counter with connect cards",
+    "Coffee Hour Host": "people gathered joyfully around a table with coffee mugs, deep in conversation",
+    
+    "Children": "brightly lit joyful classroom setting, adult kneeling to interact gently with smiling children, safe and caring environment",
+    "Nursery Volunteer": "caring adult holding and playing with toddlers in a safe padded room",
+    "Sunday School Teacher": "engaging teacher motioning enthusiastically to a small circle of children",
+    "Youth Leader": "relatable mentor figure sitting casually in a circle with teenagers having a deep discussion",
+    
+    "Usher": "organized confident individuals standing near aisles, gently guiding people to their seats",
+    "Security Team": "observant individual with a walkie-talkie looking thoughtfully over a gathered crowd",
+    "Parking Team": "smiling volunteer with an orange vest directing flow gracefully outdoors",
+    
+    "Tech": "focused individuals in a dimly lit sound booth, operating mixing consoles and looking toward a stage",
+    "AV Tech": "focused individuals in a dimly lit sound booth, operating mixing consoles and looking toward a stage",
+    "Sound Tech": "audio engineer moving faders on a live mixing board",
+    "Media/Slides Operator": "attentive volunteer clicking a mouse near glowing computer screens displaying lyrics",
+    
+    "Altar/Communion": "close up of hands reverently preparing a simple wooden table with bread and a chalice",
+    "Altar Guild": "close up of hands reverently preparing a simple wooden table with bread and a chalice",
+    "Communion Assistant": "person with gentle expression holding a silver tray or chalice",
+    "Acolyte": "youth thoughtfully carrying a tall processional cross or lighting candles",
+    
+    "Speaking/Reading": "person standing confidently behind a simple wooden lectern reading an open book",
+    "Lector": "person standing confidently behind a simple wooden lectern reading an open book",
+    "Reader": "person standing confidently behind a simple wooden lectern reading an open book",
+    "Liturgist": "person standing confidently behind a simple wooden lectern reading an open book",
+    
+    "Prayer": "two people sitting closely together with bowed heads and gentle supportive touches",
+    "Prayer Team": "two people sitting closely together with bowed heads and gentle supportive touches",
+    "Intercessor": "individual looking up with peaceful, focused devotion in a quiet corner",
+    
+    "General_Default": "helpful person in the community engaging positively with others"
+  },
+  "flyer_heroes": {
+    "default": "16:9 wide banner shot focusing on a joyful church volunteer actively serving in their role (such as a friendly greeter shaking hands, an usher, or a leader), smiling warmly while interacting with others. The church architecture strongly establishes that all seating is correctly facing forward toward the stage or altar",
+    "worship": "16:9 wide banner shot taken looking across a congregation engaged in worship, showing faces and emotion, beautiful inspiring scale",
+    "community": "16:9 wide banner shot of diverse people and families gathered outside a church space, looking toward a focal point, panoramic layout"
+  }
+}

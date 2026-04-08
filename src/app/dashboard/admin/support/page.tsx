@@ -46,6 +46,13 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface UserProfile {
   churchId?: string;
@@ -53,28 +60,39 @@ interface UserProfile {
 }
 
 interface SupportTicket {
+  id?: string;
   subject: string;
   submittedByUid: string;
   submittedByName?: string;
   status: "Open" | "In Progress" | "Closed";
+  priority?: "Low" | "Medium" | "High" | "Critical";
+  category?: "Access" | "Billing" | "Technical" | "Scheduling" | "Other";
+  assignedToName?: string | null;
   createdAt: { seconds: number; nanoseconds: number } | any;
 }
+
+const PRIORITY_VARIANT: Record<string, "outline" | "warning" | "destructive"> = {
+  Low: "outline",
+  Medium: "warning",
+  High: "destructive",
+  Critical: "destructive",
+};
 
 export default function AdminSupportPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState<SupportTicket["priority"]>("Medium");
+  const [category, setCategory] = useState<SupportTicket["category"]>("Technical");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- Data Fetching ---
   const userDocRef = useMemoFirebase(
     () => (user?.uid && firestore ? doc(firestore, "users", user.uid) : null),
     [user?.uid, firestore],
   );
   const { data: userProfile } = useDoc<UserProfile>(userDocRef);
 
-  // Query tickets for the ENTIRE church
   const churchTicketsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile?.churchId) return null;
     return query(
@@ -105,6 +123,8 @@ export default function AdminSupportPage() {
       submittedByName: user.displayName || user.email,
       churchId: userProfile.churchId || null,
       status: "Open",
+      priority,
+      category,
       createdAt: serverTimestamp(),
       lastActivityAt: serverTimestamp(),
     };
@@ -115,6 +135,8 @@ export default function AdminSupportPage() {
       toast.success("Support ticket submitted successfully!");
       setSubject("");
       setDescription("");
+      setPriority("Medium");
+      setCategory("Technical");
     } catch (e: any) {
       console.error(e);
       toast.error("Failed to submit ticket.");
@@ -131,22 +153,16 @@ export default function AdminSupportPage() {
 
   const getStatusVariant = (status: SupportTicket["status"]) => {
     switch (status) {
-      case "Open":
-        return "warning";
-      case "In Progress":
-        return "secondary";
-      case "Closed":
-        return "default";
-      default:
-        return "outline";
+      case "Open": return "warning";
+      case "In Progress": return "info";
+      case "Closed": return "default";
+      default: return "outline";
     }
   };
 
   const formatDate = (timestamp: SupportTicket["createdAt"]) => {
     if (!timestamp) return "N/A";
-    if (timestamp.seconds) {
-      return format(new Date(timestamp.seconds * 1000), "MMM d, yyyy");
-    }
+    if (timestamp.seconds) return format(new Date(timestamp.seconds * 1000), "MMM d, yyyy");
     return format(new Date(timestamp), "MMM d, yyyy");
   };
 
@@ -176,6 +192,37 @@ export default function AdminSupportPage() {
                   placeholder="e.g., Issue with schedule"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select value={category} onValueChange={(v) => setCategory(v as SupportTicket["category"])}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Access">Access</SelectItem>
+                      <SelectItem value="Billing">Billing</SelectItem>
+                      <SelectItem value="Technical">Technical</SelectItem>
+                      <SelectItem value="Scheduling">Scheduling</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Priority</Label>
+                  <Select value={priority} onValueChange={(v) => setPriority(v as SupportTicket["priority"])}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Low">Low</SelectItem>
+                      <SelectItem value="Medium">Medium</SelectItem>
+                      <SelectItem value="High">High</SelectItem>
+                      <SelectItem value="Critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
@@ -202,12 +249,13 @@ export default function AdminSupportPage() {
               <CardDescription>All tickets submitted by you or your volunteers.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-hidden overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Subject</TableHead>
                       <TableHead>Submitted By</TableHead>
+                      <TableHead>Priority</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead className="text-right">Action</TableHead>
@@ -216,22 +264,36 @@ export default function AdminSupportPage() {
                   <TableBody>
                     {ticketsLoading && (
                       <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center">
+                        <TableCell colSpan={6} className="h-24 text-center">
                           Loading tickets...
                         </TableCell>
                       </TableRow>
                     )}
                     {!ticketsLoading && tickets?.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center">
+                        <TableCell colSpan={6} className="h-24 text-center">
                           No tickets found for your church.
                         </TableCell>
                       </TableRow>
                     )}
                     {tickets?.map((ticket) => (
                       <TableRow key={ticket.id}>
-                        <TableCell className="font-medium">{ticket.subject}</TableCell>
+                        <TableCell className="font-medium">
+                          <div>{ticket.subject}</div>
+                          {ticket.category && (
+                            <div className="text-xs text-muted-foreground">{ticket.category}</div>
+                          )}
+                        </TableCell>
                         <TableCell>{ticket.submittedByName || "Unknown"}</TableCell>
+                        <TableCell>
+                          {ticket.priority ? (
+                            <Badge variant={PRIORITY_VARIANT[ticket.priority] ?? "outline"}>
+                              {ticket.priority}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant={getStatusVariant(ticket.status)}>{ticket.status}</Badge>
                         </TableCell>

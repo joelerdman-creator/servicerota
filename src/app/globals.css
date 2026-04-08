@@ -72,8 +72,12 @@
   b {
     color: hsl(var(--primary));
   }
-  h2,
-  h3 {
+
+  /* Orange headings are intentional on marketing pages only.
+     Apply .marketing-section to a wrapper, or use .heading-accent directly. */
+  .marketing-section h2,
+  .marketing-section h3,
+  .heading-accent {
     color: hsl(var(--brand-accent-hsl));
   }
 }

@@ -22,6 +22,9 @@ const badgeVariants = cva(
         // Teal — complements navy; use for active/ongoing/healthy states
         success:
           "border-transparent bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900/40 dark:text-teal-300",
+        // Indigo — use for in-progress / active workflow states
+        info:
+          "border-transparent bg-indigo-100 text-indigo-800 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300",
       },
     },
     defaultVariants: {

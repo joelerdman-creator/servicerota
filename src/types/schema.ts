@@ -25,6 +25,10 @@ export interface SupportTicket {
   submittedByName?: string;
   churchId?: string | null;
   status: "Open" | "In Progress" | "Closed";
+  priority?: "Low" | "Medium" | "High" | "Critical";
+  category?: "Access" | "Billing" | "Technical" | "Scheduling" | "Other";
+  assignedToUid?: string | null;
+  assignedToName?: string | null;
   createdAt: Timestamp | { seconds: number; nanoseconds: number } | any;
   lastActivityAt?: Timestamp | any;
 }

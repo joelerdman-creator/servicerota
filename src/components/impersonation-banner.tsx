@@ -25,21 +25,24 @@ export function ImpersonationBanner() {
       if (!stored) throw new Error("Original session not found.");
 
       const { idToken } = JSON.parse(stored) as { idToken: string };
-      const customToken = await fetch("/api/auth/restore-session", {
+      const res = await fetch("/api/auth/restore-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken }),
-      }).then((r) => r.json());
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
 
-      if (customToken.error) throw new Error(customToken.error);
+      // Use credential directly to avoid auth.currentUser race condition
+      const credential = await signInWithCustomToken(auth, data.customToken);
+      const newIdToken = await credential.user.getIdToken();
 
-      await signInWithCustomToken(auth, customToken.customToken);
-      const newIdToken = await auth.currentUser?.getIdToken();
-      await fetch("/api/auth/session", {
+      const sessionRes = await fetch("/api/auth/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken: newIdToken }),
       });
+      if (!sessionRes.ok) throw new Error("Failed to restore server session.");
 
       sessionStorage.removeItem("impersonation_active");
       sessionStorage.removeItem("original_user_session");

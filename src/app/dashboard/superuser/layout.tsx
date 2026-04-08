@@ -108,10 +108,10 @@ export default function SuperUserLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex flex-col min-h-screen">
       {/* Super User Header - Deep Red / Dark themed bar to distinguish */}
-      <header className="bg-red-950 text-red-100 shadow-md sticky top-0 z-30 border-b border-red-500/30">
+      <header className="bg-slate-900 text-slate-100 shadow-md sticky top-0 z-30 border-b border-indigo-500/20">
         <div className="container mx-auto px-4 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <Link href="/dashboard/superuser" className="flex items-center gap-2 font-bold text-xl text-red-300">
+            <Link href="/dashboard/superuser" className="flex items-center gap-2 font-bold text-xl text-indigo-300">
               <ShieldAlert className="h-6 w-6" />
               <span className="hidden sm:inline">Super User</span>
             </Link>
@@ -125,8 +125,8 @@ export default function SuperUserLayout({ children }: { children: React.ReactNod
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-red-500/20",
-                      isActive ? "bg-red-500/30 text-red-50" : "text-red-200/80"
+                      "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-indigo-500/15",
+                      isActive ? "bg-indigo-500/25 text-white" : "text-slate-300"
                     )}
                   >
                     <item.icon className="h-4 w-4" />
@@ -141,13 +141,13 @@ export default function SuperUserLayout({ children }: { children: React.ReactNod
             {/* Mobile Navigation Toggle */}
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden text-red-100">
+                <Button variant="ghost" size="icon" className="lg:hidden text-slate-100">
                   <Menu className="h-6 w-6" />
                   <span className="sr-only">Toggle navigation menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[300px] bg-red-950 border-r-red-500/30 text-red-100">
-                <SheetTitle className="flex items-center gap-2 mb-8 text-red-300">
+              <SheetContent side="left" className="w-[300px] bg-slate-900 border-r-red-500/30 text-slate-100">
+                <SheetTitle className="flex items-center gap-2 mb-8 text-indigo-300">
                   <ShieldAlert className="h-6 w-6" />
                   <span>Parish Scribe SuperUser</span>
                 </SheetTitle>
@@ -160,7 +160,7 @@ export default function SuperUserLayout({ children }: { children: React.ReactNod
                           href={item.href}
                           className={cn(
                             "flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-all",
-                            isActive ? "bg-red-500/30 text-red-50" : "text-red-200/80 hover:bg-red-500/20"
+                            isActive ? "bg-indigo-500/25 text-white" : "text-slate-300 hover:bg-indigo-500/15"
                           )}
                         >
                           <item.icon className="h-5 w-5" />
@@ -169,9 +169,9 @@ export default function SuperUserLayout({ children }: { children: React.ReactNod
                       </SheetClose>
                     );
                   })}
-                  <div className="mt-4 pt-4 border-t border-red-500/30">
+                  <div className="mt-4 pt-4 border-t border-indigo-500/20">
                     <SheetClose asChild>
-                      <Link href="/dashboard/admin" className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium text-red-200/80 hover:bg-red-500/20">
+                      <Link href="/dashboard/admin" className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium text-slate-300 hover:bg-indigo-500/15">
                         <Repeat className="h-5 w-5" />
                         Return to Admin
                       </Link>
@@ -184,10 +184,10 @@ export default function SuperUserLayout({ children }: { children: React.ReactNod
             {/* User Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full relative ring-offset-red-950">
-                  <Avatar className="h-8 w-8 border border-red-500/30">
+                <Button variant="ghost" size="icon" className="rounded-full relative ring-offset-slate-900">
+                  <Avatar className="h-8 w-8 border border-indigo-500/20">
                     <AvatarImage src={user?.photoURL || ""} alt={user?.displayName || ""} />
-                    <AvatarFallback className="bg-red-100 text-red-950">{getInitials(user?.displayName)}</AvatarFallback>
+                    <AvatarFallback className="bg-indigo-100 text-slate-900">{getInitials(user?.displayName)}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>

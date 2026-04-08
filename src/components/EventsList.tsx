@@ -40,38 +40,39 @@ export default function EventsList({ events, isLoading, title, onEventClick }: E
         {events?.map((event) => (
           <div
             key={event.id}
-            className="p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+            className="px-4 py-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
             onClick={() => onEventClick(event)}
           >
-            <div className="flex justify-between items-start gap-2">
+            <div className="flex justify-between items-center gap-3">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="min-w-0">
-                  <span className="font-bold">{event.eventName}</span>
-                  <span className="text-muted-foreground font-normal">
-                    {" — "}
-                    {format(new Date(event.eventDate), "EEE MMM d, yyyy")}
-                    <span className="text-xs ml-1">
-                      {format(new Date(event.eventDate), "h:mm a")}
-                    </span>
+                <span className="font-semibold truncate">{event.eventName}</span>
+                <span className="text-muted-foreground text-sm whitespace-nowrap hidden sm:inline">
+                  {format(new Date(event.eventDate), "EEE MMM d")}
+                  <span className="text-xs ml-1 text-muted-foreground/70">
+                    {format(new Date(event.eventDate), "h:mm a")}
                   </span>
-                </div>
+                </span>
                 {event.seriesId && (
-                  <Repeat className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Recurring Event" />
+                  <Repeat className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" aria-label="Recurring" />
                 )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {event.eventType && (
-                  <Badge variant={event.eventType === "Service" ? "default" : "secondary"}>
-                    {event.eventType}
-                  </Badge>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {event.eventType && event.eventType !== "Service" && (
+                  <Badge variant="secondary" className="text-xs">{event.eventType}</Badge>
                 )}
-                <Badge variant={event.isPublished ? "default" : "secondary"}>
+                <Badge
+                  variant={event.isPublished ? "default" : "outline"}
+                  className="text-xs"
+                >
                   {event.isPublished ? "Published" : "Draft"}
                 </Badge>
-                <Badge variant="outline">Manage</Badge>
               </div>
             </div>
-            {event.notes && <p className="text-sm mt-2 text-muted-foreground">{event.notes}</p>}
+            {/* Mobile date fallback */}
+            <p className="text-xs text-muted-foreground mt-0.5 sm:hidden">
+              {format(new Date(event.eventDate), "EEE MMM d, yyyy 'at' h:mm a")}
+            </p>
+            {event.notes && <p className="text-sm mt-1.5 text-muted-foreground">{event.notes}</p>}
           </div>
         ))}
       </CardContent>

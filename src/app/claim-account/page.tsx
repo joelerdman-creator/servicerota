@@ -27,6 +27,8 @@ interface PendingProfile {
   churchId: string;
   isManagedByAdmin?: boolean;
   status?: "pending_invitation" | "active";
+  /** True when the doc was created via the /join page claim flow */
+  claimable?: boolean;
 }
 
 function ClaimAccount() {
@@ -61,8 +63,15 @@ function ClaimAccount() {
       const userDocRef = doc(firestore, "users", token);
       try {
         const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists() && userDoc.data().status === "pending_invitation") {
-          setPendingProfile(userDoc.data() as PendingProfile);
+        const data = userDoc.data();
+        // Accept: (a) pending_invitation — standard admin invite flow
+        //         (b) active + isManagedByAdmin — admin-managed volunteer claiming via /join QR
+        const isClaimable =
+          userDoc.exists() &&
+          (data?.status === "pending_invitation" ||
+            (data?.status === "active" && data?.isManagedByAdmin === true));
+        if (isClaimable) {
+          setPendingProfile(data as PendingProfile);
         } else {
           setError("This invitation is no longer valid.");
         }
@@ -95,7 +104,7 @@ function ClaimAccount() {
         photoURL: newUser.photoURL,
         status: "active" as const,
         isManagedByAdmin: false,
-        id: newUser.uid, // Add the real UID to the document
+        id: newUser.uid,
       };
 
       const userDocToUpdateRef = doc(firestore, "users", token);

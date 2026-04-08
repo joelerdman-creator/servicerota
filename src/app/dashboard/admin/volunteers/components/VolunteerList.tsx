@@ -47,6 +47,13 @@ export function VolunteerList({
     }
   };
 
+  const getStatusDot = (status?: string) => {
+    if (status === "pending_approval" || status === "pending_invitation") {
+      return <span className="h-2 w-2 rounded-full bg-amber-400 shrink-0" title="Pending" />;
+    }
+    return <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" title="Active" />;
+  };
+
   if (volunteers.length === 0) {
     return (
       <div className="p-4 text-center text-muted-foreground">
@@ -62,17 +69,22 @@ export function VolunteerList({
           key={volunteer.id}
           className="flex items-center justify-between p-3 border-b last:border-b-0 "
         >
-          <div className="flex items-center gap-4 flex-1">
-            <Avatar>
-              <AvatarImage
-                src={volunteer.photoURL}
-                alt={`${volunteer.firstName} ${volunteer.lastName}`}
-              />
-              <AvatarFallback>
-                {getInitials(volunteer.firstName, volunteer.lastName)}
-              </AvatarFallback>
-            </Avatar>
-            <div>
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="relative shrink-0">
+              <Avatar>
+                <AvatarImage
+                  src={volunteer.photoURL}
+                  alt={`${volunteer.firstName} ${volunteer.lastName}`}
+                />
+                <AvatarFallback>
+                  {getInitials(volunteer.firstName, volunteer.lastName)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="absolute -bottom-0.5 -right-0.5 block rounded-full ring-2 ring-background">
+                {getStatusDot(volunteer.status)}
+              </span>
+            </div>
+            <div className="min-w-0">
               <div className="font-semibold flex items-center gap-2 flex-wrap">
                 {volunteer.firstName} {volunteer.lastName}
                 {volunteer.isAdmin && (
@@ -84,24 +96,26 @@ export function VolunteerList({
                 {volunteer.isManagedByAdmin && !volunteer.isAdmin && (
                   <Badge variant="outline">Admin-Managed</Badge>
                 )}
-                {volunteer.availableRecurringEventSeriesIds?.map((seriesId) => {
+                {getStatusBadge(volunteer.status)}
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                <p className="text-sm text-muted-foreground truncate">
+                  {volunteer.email || "No email provided"}
+                </p>
+                {volunteer.availableRecurringEventSeriesIds?.slice(0, 2).map((seriesId) => {
                   const service = recurringServices.find((s) => s.seriesId === seriesId);
                   if (!service) return null;
                   return (
                     <Badge
                       key={seriesId}
                       variant="secondary"
-                      className={cn(getServiceColor(seriesId), "border-none font-normal")}
+                      className={cn(getServiceColor(seriesId), "border-none font-normal text-xs")}
                     >
                       {service.eventName}
                     </Badge>
                   );
                 })}
               </div>
-              <p className="text-sm text-muted-foreground flex items-center gap-2">
-                {volunteer.email || "No email provided"}
-                {getStatusBadge(volunteer.status)}
-              </p>
             </div>
           </div>
 

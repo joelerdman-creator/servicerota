@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Lora } from "next/font/google";
 import { Providers } from "./providers";
 import { cn } from "@/lib/utils";
 import { DebugConsole } from "@/components/DebugConsole";
@@ -9,6 +9,12 @@ import "./globals.css";
 const fontSans = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
+});
+
+const fontDisplay = Lora({
+  subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -52,6 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={cn(
           "min-h-screen bg-background font-sans antialiased",
           fontSans.variable,
+          fontDisplay.variable,
         )}
       >
         <Providers>

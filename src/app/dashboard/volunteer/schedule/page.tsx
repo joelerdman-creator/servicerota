@@ -293,19 +293,33 @@ export default function SchedulePage() {
           />
 
           {/* Calendar subscription */}
-          <Card className="mb-6 bg-muted/30">
+          <Card className="mb-6 border-primary/20 bg-primary/5">
             <CardContent className="pt-4 pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <CalendarDays className="h-5 w-5 text-primary shrink-0 hidden sm:block" />
+              <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">Subscribe to Your Schedule</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <CalendarDays className="h-4 w-4 text-primary shrink-0" />
+                    <p className="font-semibold text-sm">Personal Calendar Feed</p>
+                  </div>
                   {calendarFeedUrl ? (
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">{calendarFeedUrl}</p>
+                    <p className="text-xs text-muted-foreground truncate">{calendarFeedUrl}</p>
                   ) : (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Get your assignments in Google Calendar, Apple Calendar, or Outlook — automatically kept up to date.
+                    <p className="text-xs text-muted-foreground">
+                      Subscribe once — your assignments sync automatically. Works with:
                     </p>
                   )}
+                  {/* App badges */}
+                  <div className="flex items-center gap-1.5 mt-2">
+                    {[
+                      { label: "Google", bg: "bg-[#4285F4]" },
+                      { label: "Outlook", bg: "bg-[#0078D4]" },
+                      { label: "Apple", bg: "bg-gray-800" },
+                    ].map(({ label, bg }) => (
+                      <span key={label} className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold text-white ${bg}`}>
+                        {label}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 {calendarFeedUrl ? (
                   <div className="flex gap-2 shrink-0">
@@ -321,7 +335,7 @@ export default function SchedulePage() {
                 ) : (
                   <Button size="sm" onClick={handleGenerateCalendarToken} disabled={isGeneratingToken} className="shrink-0">
                     {isGeneratingToken ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <CalendarDays className="h-3.5 w-3.5 mr-1" />}
-                    Generate Calendar Link
+                    Generate Link
                   </Button>
                 )}
               </div>
@@ -370,78 +384,83 @@ export default function SchedulePage() {
                   </p>
                 )}
                 {!isLoading && assignments.length > 0 && (
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     {assignments
                       .filter((a) => isFuture(parseISO(a.event.eventDate)))
-                      .map((assignment) => (
-                        <div
-                          key={assignment.role.id}
-                          className="p-4 border rounded-lg flex flex-col sm:flex-row justify-between sm:items-center gap-4"
-                        >
-                          <div>
-                            <h3 className="font-bold text-lg">{assignment.event.eventName}</h3>
-                            <p className="text-muted-foreground">
-                              {format(
-                                parseISO(assignment.event.eventDate),
-                                "EEEE, MMMM do, yyyy 'at' h:mm a",
-                              )}
-                            </p>
-                            <p className="font-semibold text-primary mt-1">
-                              {assignment.assignedVolunteerName} - {assignment.role.roleName}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={assignment.role.status === "Confirmed" ? "default" : "secondary"}
-                            >
-                              {assignment.role.status}
-                            </Badge>
-                             {assignment.role.assignedVolunteerId === user?.uid && (
-                                <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={assignment.role.status === "Pending Substitution"}
-                                    >
-                                    {assignment.role.status === "Pending Substitution"
-                                        ? "Request Sent"
-                                        : "Request Sub"}
+                      .map((assignment) => {
+                        const isConfirmed = assignment.role.status === "Confirmed";
+                        const isPendingSub = assignment.role.status === "Pending Substitution";
+                        const isMe = assignment.role.assignedVolunteerId === user?.uid;
+                        const initials = assignment.assignedVolunteerName
+                          .split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+                        return (
+                          <div
+                            key={assignment.role.id}
+                            className="flex items-center justify-between px-4 py-3 rounded-lg border bg-card gap-4"
+                          >
+                            {/* Left: avatar + names */}
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-primary">{initials}</span>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-sm leading-tight truncate">
+                                  {assignment.event.eventName}
+                                </p>
+                                <p className="text-xs text-muted-foreground leading-tight">
+                                  {format(parseISO(assignment.event.eventDate), "EEE, MMM do 'at' h:mm a")}
+                                  {" · "}<span className="font-medium text-foreground/70">{assignment.role.roleName}</span>
+                                  {assignment.assignedVolunteerName !== (user?.displayName || "") && (
+                                    <span className="text-muted-foreground"> ({assignment.assignedVolunteerName})</span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Right: status + actions */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Badge
+                                variant={isConfirmed ? "default" : isPendingSub ? "warning" : "secondary"}
+                                className="hidden sm:inline-flex"
+                              >
+                                {isPendingSub ? "Sub Requested" : assignment.role.status}
+                              </Badge>
+                              {isMe && (
+                                <>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="outline" size="sm" disabled={isPendingSub}>
+                                        {isPendingSub ? "Pending…" : "Request Sub"}
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Request a Substitute?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          This will notify other available volunteers in this role that a spot
+                                          is open. Your name will be removed from the schedule if someone else
+                                          accepts. Are you sure?
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleRequestSubstitution(assignment)}>
+                                          Yes, Request Sub
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                  {!isPendingSub && (
+                                    <Button variant="ghost" size="sm" onClick={() => setTradeAssignment(assignment)}>
+                                      <ArrowLeftRight className="h-4 w-4" />
                                     </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                    <AlertDialogTitle>Request a Substitute?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        This will notify other available volunteers in this role that a spot
-                                        is open. Your name will be removed from the schedule if someone else
-                                        accepts. Are you sure?
-                                    </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                        onClick={() => handleRequestSubstitution(assignment)}
-                                    >
-                                        Yes, Request Sub
-                                    </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                                </AlertDialog>
-                             )}
-                             {assignment.role.assignedVolunteerId === user?.uid && assignment.role.status !== "Pending Substitution" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setTradeAssignment(assignment)}
-                                >
-                                  <ArrowLeftRight className="mr-2 h-4 w-4" />
-                                  Trade
-                                </Button>
-                             )}
+                                  )}
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 )}
               </CardContent>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/firebase";
-import { signOut } from "firebase/auth";
+import { signInWithCustomToken } from "firebase/auth";
 import { Button } from "./ui/button";
 import { AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
@@ -12,6 +12,7 @@ const originalUserSessionKey = "original_user_session";
 
 export function ImpersonationBanner() {
   const [impersonatedUser, setImpersonatedUser] = useState<string | null>(null);
+  const [isReturning, setIsReturning] = useState(false);
   const auth = useAuth();
 
   useEffect(() => {
@@ -30,28 +31,45 @@ export function ImpersonationBanner() {
 
   const handleReturnToSuperUser = async () => {
     if (!auth) return;
+    setIsReturning(true);
     const returnToast = toast.loading("Returning to Super User account...");
 
     try {
-      // Clear all session storage related to impersonation
+      const stored = sessionStorage.getItem(originalUserSessionKey);
+      if (!stored) throw new Error("Original session not found. Please sign in again.");
+
+      const { idToken } = JSON.parse(stored) as { idToken: string };
+
+      // Exchange the stored original token for a fresh custom token
+      const res = await fetch("/api/auth/restore-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      // Sign in as the superuser with the restored custom token
+      const credential = await signInWithCustomToken(auth, data.customToken);
+
+      // Get a fresh ID token from the credential and update the server session cookie
+      const newIdToken = await credential.user.getIdToken();
+      const sessionRes = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken: newIdToken }),
+      });
+      if (!sessionRes.ok) throw new Error("Failed to restore server session.");
+
       sessionStorage.removeItem(impersonationSessionKey);
       sessionStorage.removeItem(originalUserSessionKey);
 
-      // Sign out the current (impersonated) user from the client
-      await signOut(auth);
-
-      // This will trigger a re-authentication flow in the FirebaseProvider,
-      // which will then call our /api/auth/session to clear the server cookie.
-      // After that, we redirect. The Super User's session is still valid on the server,
-      // so they will be automatically logged back in.
-      toast.success("Returned to Super User account. Redirecting...", { id: returnToast });
+      toast.success("Returned to Super User account.", { id: returnToast });
       window.location.href = "/dashboard/superuser";
     } catch (error: any) {
       console.error("Failed to return to super user:", error);
-      toast.error(`Error: ${error.message}`, { id: returnToast });
-      // As a fallback, clear everything and go to login
-      sessionStorage.clear();
-      window.location.href = "/";
+      toast.error(`Failed to restore session: ${error.message}`, { id: returnToast });
+      setIsReturning(false);
     }
   };
 
@@ -67,11 +85,12 @@ export function ImpersonationBanner() {
       </span>
       <Button
         onClick={handleReturnToSuperUser}
+        disabled={isReturning}
         variant="ghost"
         size="sm"
-        className="text-yellow-900 hover:bg-yellow-500/50 hover:text-yellow-900"
+        className="text-yellow-900 hover:bg-yellow-500/50 hover:text-yellow-900 disabled:opacity-60"
       >
-        Return to Super User Account
+        {isReturning ? "Returning..." : "Return to Super User Account"}
       </Button>
     </div>
   );

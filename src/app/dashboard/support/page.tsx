@@ -43,6 +43,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useSearchParams } from "next/navigation";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface UserProfile {
   churchId?: string | null;
@@ -57,15 +64,26 @@ interface SupportTicket {
   submittedByName?: string;
   churchId?: string | null;
   status: "Open" | "In Progress" | "Closed";
+  priority?: "Low" | "Medium" | "High" | "Critical";
+  category?: "Access" | "Billing" | "Technical" | "Scheduling" | "Other";
   createdAt: { seconds: number; nanoseconds: number } | any;
   lastActivityAt?: any;
 }
+
+const PRIORITY_VARIANT: Record<string, "outline" | "warning" | "destructive"> = {
+  Low: "outline",
+  Medium: "warning",
+  High: "destructive",
+  Critical: "destructive",
+};
 
 export default function SupportPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState<SupportTicket["priority"]>("Medium");
+  const [category, setCategory] = useState<SupportTicket["category"]>("Technical");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const searchParams = useSearchParams();
@@ -80,15 +98,12 @@ export default function SupportPage() {
 
   const userTicketsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
-    // REMOVED orderBy('createdAt', 'desc') to avoid permission/index conflicts.
-    // We will sort client-side.
     return query(collection(firestore, "support_tickets"), where("submittedByUid", "==", user.uid));
   }, [firestore, user?.uid]);
 
   const { data: rawTickets, isLoading: ticketsLoading } =
     useCollection<SupportTicket>(userTicketsQuery);
 
-  // Client-side Sort
   const tickets = rawTickets?.sort((a, b) => {
     const dateA = a.createdAt?.seconds || 0;
     const dateB = b.createdAt?.seconds || 0;
@@ -113,6 +128,8 @@ export default function SupportPage() {
       submittedByName: user.displayName || user.email || "Unknown",
       churchId: userProfile.churchId || null,
       status: "Open",
+      priority,
+      category,
       createdAt: serverTimestamp(),
       lastActivityAt: serverTimestamp(),
     };
@@ -123,6 +140,8 @@ export default function SupportPage() {
       toast.success("Support ticket submitted successfully!");
       setSubject("");
       setDescription("");
+      setPriority("Medium");
+      setCategory("Technical");
     } catch (e: any) {
       console.error(e);
       toast.error("Failed to submit ticket.");
@@ -142,7 +161,7 @@ export default function SupportPage() {
       case "Open":
         return "warning";
       case "In Progress":
-        return "secondary";
+        return "info";
       case "Closed":
         return "default";
       default:
@@ -194,6 +213,37 @@ export default function SupportPage() {
                     placeholder="e.g., Issue with schedule"
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select value={category} onValueChange={(v) => setCategory(v as SupportTicket["category"])}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Access">Access</SelectItem>
+                        <SelectItem value="Billing">Billing</SelectItem>
+                        <SelectItem value="Technical">Technical</SelectItem>
+                        <SelectItem value="Scheduling">Scheduling</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Priority</Label>
+                    <Select value={priority} onValueChange={(v) => setPriority(v as SupportTicket["priority"])}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Low">Low</SelectItem>
+                        <SelectItem value="Medium">Medium</SelectItem>
+                        <SelectItem value="High">High</SelectItem>
+                        <SelectItem value="Critical">Critical</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
                   <Textarea
@@ -220,11 +270,12 @@ export default function SupportPage() {
                 <CardDescription>A list of your submitted support tickets.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="border rounded-lg overflow-hidden">
+                <div className="border rounded-lg overflow-hidden overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Subject</TableHead>
+                        <TableHead>Priority</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead className="text-right">Action</TableHead>
@@ -233,21 +284,35 @@ export default function SupportPage() {
                     <TableBody>
                       {ticketsLoading && (
                         <TableRow>
-                          <TableCell colSpan={4} className="h-24 text-center">
+                          <TableCell colSpan={5} className="h-24 text-center">
                             Loading your tickets...
                           </TableCell>
                         </TableRow>
                       )}
                       {!ticketsLoading && tickets?.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={4} className="h-24 text-center">
+                          <TableCell colSpan={5} className="h-24 text-center">
                             You haven't submitted any tickets.
                           </TableCell>
                         </TableRow>
                       )}
                       {tickets?.map((ticket) => (
                         <TableRow key={ticket.id}>
-                          <TableCell className="font-medium">{ticket.subject}</TableCell>
+                          <TableCell className="font-medium">
+                            <div>{ticket.subject}</div>
+                            {ticket.category && (
+                              <div className="text-xs text-muted-foreground">{ticket.category}</div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {ticket.priority ? (
+                              <Badge variant={PRIORITY_VARIANT[ticket.priority] ?? "outline"}>
+                                {ticket.priority}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <Badge variant={getStatusVariant(ticket.status)}>{ticket.status}</Badge>
                           </TableCell>

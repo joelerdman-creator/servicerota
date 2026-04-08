@@ -282,60 +282,64 @@ function ClaimTrade() {
             {trade?.requesterName} wants to swap assignments with you.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* What they offer */}
-          <div className="p-4 rounded-lg border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-            <p className="text-xs font-medium text-green-600 dark:text-green-400 uppercase tracking-wide mb-1">
-              They are offering you
-            </p>
-            <p className="font-semibold text-lg">{trade?.requesterRoleName}</p>
-            <p className="text-sm text-muted-foreground">{trade?.requesterEventName}</p>
-            <p className="text-sm text-muted-foreground">
-              {trade?.requesterEventDate &&
-                format(parseISO(trade.requesterEventDate), "EEEE, MMMM do, yyyy 'at' h:mm a")}
-            </p>
+        <CardContent className="space-y-5">
+          {/* Side-by-side swap cards */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* They offer */}
+            <div className="rounded-lg border-2 border-teal-200 bg-teal-50 dark:bg-teal-900/20 dark:border-teal-800 p-3 space-y-1">
+              <p className="text-[11px] font-semibold text-teal-600 dark:text-teal-400 uppercase tracking-wide">
+                They offer you
+              </p>
+              <p className="font-bold text-sm leading-tight">{trade?.requesterRoleName}</p>
+              <p className="text-xs text-muted-foreground leading-tight">{trade?.requesterEventName}</p>
+              <p className="text-xs font-medium text-teal-700 dark:text-teal-300">
+                {trade?.requesterEventDate &&
+                  format(parseISO(trade.requesterEventDate), "MMM do 'at' h:mm a")}
+              </p>
+            </div>
+
+            {/* You give */}
+            <div className="rounded-lg border-2 border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3 space-y-1">
+              <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+                In exchange for
+              </p>
+              <p className="font-bold text-sm leading-tight">{trade?.targetRoleName}</p>
+              <p className="text-xs text-muted-foreground leading-tight">{trade?.targetEventName}</p>
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                {trade?.targetEventDate &&
+                  format(parseISO(trade.targetEventDate), "MMM do 'at' h:mm a")}
+              </p>
+            </div>
           </div>
 
-          <div className="flex justify-center">
-            <ArrowLeftRight className="h-5 w-5 text-muted-foreground" />
-          </div>
-
-          {/* What they want */}
-          <div className="p-4 rounded-lg border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
-            <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide mb-1">
-              In exchange for your
-            </p>
-            <p className="font-semibold text-lg">{trade?.targetRoleName}</p>
-            <p className="text-sm text-muted-foreground">{trade?.targetEventName}</p>
-            <p className="text-sm text-muted-foreground">
-              {trade?.targetEventDate &&
-                format(parseISO(trade.targetEventDate), "EEEE, MMMM do, yyyy 'at' h:mm a")}
-            </p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <ArrowLeftRight className="h-3.5 w-3.5 shrink-0" />
+            Both assignments will be swapped automatically upon acceptance.
           </div>
 
           {user ? (
-            <div className="flex gap-2 pt-2">
+            <div className="flex gap-2 pt-1">
               <Button
                 variant="outline"
-                className="flex-1 text-destructive hover:text-destructive"
+                className="flex-1 text-destructive hover:text-destructive border-destructive/30"
                 onClick={handleDeclineTrade}
                 disabled={isProcessing}
               >
                 <X className="mr-2 h-4 w-4" />
                 Decline
               </Button>
-              <Button className="flex-1" onClick={handleAcceptTrade} disabled={isProcessing}>
+              <Button className="flex-1 gap-2" onClick={handleAcceptTrade} disabled={isProcessing}>
                 {isProcessing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Check className="mr-2 h-4 w-4" />
+                  <Check className="h-4 w-4" />
                 )}
                 Accept Trade
               </Button>
             </div>
           ) : (
             <div className="text-center space-y-4 pt-2">
-              <p className="text-sm">You must be signed in to respond to this trade.</p>
+              <p className="text-sm text-muted-foreground">You must be signed in to respond to this trade.</p>
               <Button onClick={handleSignIn} className="w-full">
                 <GoogleIcon className="mr-2 h-4 w-4" />
                 Sign in with Google
@@ -343,11 +347,6 @@ function ClaimTrade() {
             </div>
           )}
         </CardContent>
-        <CardFooter>
-          <p className="text-xs text-muted-foreground">
-            Accepting will automatically swap both assignments on the schedule.
-          </p>
-        </CardFooter>
       </Card>
     </div>
   );

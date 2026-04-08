@@ -325,7 +325,7 @@ function NotificationsTab() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-lg overflow-hidden overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -392,9 +392,10 @@ export default function SharingPage() {
   useEffect(() => {
     const resizeObserver = new ResizeObserver((entries) => {
       if (entries[0]) {
-        const containerWidth = entries[0].contentRect.width;
-        if (containerWidth > 0) {
-          setScaleFactor(containerWidth / FLYER_WIDTH_PX);
+        const { width } = entries[0].contentRect;
+        if (width > 0) {
+          // Scale only to width — wrapper height is set dynamically so full flyer always shows
+          setScaleFactor((width / FLYER_WIDTH_PX) * 0.99);
         }
       }
     });
@@ -573,7 +574,10 @@ useEffect(() => {
   }, [userProfile, widgetDateRange, widgetShowHeader, widgetShowLogo, widgetTitle, widgetDescription, widgetPrimaryColor, widgetTextColor, widgetBgColor, widgetFont, baseUrl]);
 
   const widgetEmbedCode = useMemo(() => widgetUrl ? `<iframe src="${widgetUrl}" width="100%" height="600" style="border:none;"></iframe>` : "", [widgetUrl]);
-  const signupUrl = useMemo(() => `${baseUrl}/claim-account`, [baseUrl]);
+  const signupUrl = useMemo(
+    () => (userProfile?.churchId ? `${baseUrl}/join/${userProfile.churchId}` : `${baseUrl}/join`),
+    [baseUrl, userProfile?.churchId],
+  );
 
   const toggleFlyerRole = (roleName: string) => {
     setSelectedFlyerRoles((prev) => {
@@ -840,80 +844,126 @@ useEffect(() => {
           </TabsContent>
           <TabsContent value="flyer">
             <Card className="border-brand-accent/20">
-              <CardHeader><CardTitle>Volunteer Recruitment Flyer</CardTitle><CardDescription>Customize and print a flyer to recruit new volunteers for your church.</CardDescription></CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="md:col-span-1 space-y-6">
-                  <div className="mb-6 space-y-3">
-                    <Label className="text-base">Hero Image</Label>
+              <CardHeader className="pb-3">
+                <CardTitle>Volunteer Recruitment Flyer</CardTitle>
+                <CardDescription>Customize and download a flyer to recruit new volunteers for your church.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col lg:flex-row gap-5 items-start">
+
+                {/* ── Controls column ── */}
+                <div className="w-full lg:w-72 xl:w-80 shrink-0 lg:sticky lg:top-4 space-y-4">
+
+                  {/* Hero image */}
+                  <div className="space-y-2">
+                    <Label className="font-semibold">Hero Image</Label>
+
                     {stockHeroImages && stockHeroImages.length > 0 && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-2">Choose a stock photo:</p>
-                        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
+                        <p className="text-xs text-muted-foreground mb-2">Stock photos:</p>
+                        <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-0.5">
                           {stockHeroImages.map((img) => (
                             <button
                               key={img.id}
                               type="button"
                               onClick={() => { setSelectedStockImageUrl(img.url); setFlyerImageUrl(undefined); }}
-                              style={{ aspectRatio: "612 / 180" }}
                               className={cn(
-                                "relative shrink-0 w-32 rounded-md overflow-hidden border-2 snap-start transition-colors",
+                                "relative w-full rounded-md overflow-hidden border-2 transition-all",
+                                "aspect-[3/1]",
                                 selectedStockImageUrl === img.url && !flyerImageUrl
-                                  ? "border-brand-accent"
+                                  ? "border-brand-accent ring-2 ring-brand-accent/30"
                                   : "border-transparent hover:border-muted-foreground/40"
                               )}
                             >
                               <Image src={img.url} alt={img.denominationCluster ?? "Stock photo"} fill className="object-cover" unoptimized />
+                              {selectedStockImageUrl === img.url && !flyerImageUrl && (
+                                <div className="absolute inset-0 bg-brand-accent/10 flex items-center justify-center">
+                                  <CheckSquare className="h-5 w-5 text-brand-accent drop-shadow" />
+                                </div>
+                              )}
                             </button>
                           ))}
                         </div>
                       </div>
                     )}
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Or upload your own (wide landscape, 16:9 recommended):</p>
-                      <div className="flex flex-col gap-2">
-                        <label
-                          htmlFor="flyer-image-upload"
-                          className="flex items-center justify-center gap-2 cursor-pointer border-2 border-dashed rounded-md p-4 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
+
+                    <label
+                      htmlFor="flyer-image-upload"
+                      className="flex items-center justify-center gap-2 cursor-pointer border-2 border-dashed rounded-md py-2.5 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
+                    >
+                      <Download className="h-4 w-4 rotate-180" />
+                      {flyerImageUrl ? "Replace upload" : "Upload your own"}
+                      <input id="flyer-image-upload" type="file" accept="image/*" className="hidden" onChange={handleFlyerImageUpload} />
+                    </label>
+                    {flyerImageUrl && (
+                      <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7 px-2" onClick={() => setFlyerImageUrl(undefined)}>
+                        Remove upload
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Roles */}
+                  <div className="space-y-1.5">
+                    <Label className="font-semibold">Roles to Display</Label>
+                    <p className="text-xs text-muted-foreground">Select roles to feature on the flyer.</p>
+                    <div className="max-h-44 overflow-y-auto space-y-0.5 border rounded-md p-2">
+                      {areRolesLoading && <p className="text-sm text-muted-foreground p-2">Loading roles...</p>}
+                      {roleTemplates?.map((role) => (
+                        <div
+                          key={role.id}
+                          className="flex items-center gap-2.5 cursor-pointer px-2 py-1.5 rounded hover:bg-muted"
+                          onClick={() => toggleFlyerRole(role.name)}
                         >
-                          <Download className="h-4 w-4 rotate-180" />
-                          {flyerImageUrl ? "Replace upload" : "Upload image"}
-                          <input
-                            id="flyer-image-upload"
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleFlyerImageUpload}
-                          />
-                        </label>
-                        {flyerImageUrl && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs text-muted-foreground"
-                            onClick={() => setFlyerImageUrl(undefined)}
-                          >
-                            Remove upload
-                          </Button>
-                        )}
-                      </div>
+                          {selectedFlyerRoles.has(role.name)
+                            ? <CheckSquare className="h-4 w-4 text-brand-accent shrink-0" />
+                            : <Square className="h-4 w-4 text-muted-foreground shrink-0" />}
+                          <span className="text-sm">{role.name}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  <div>
-                    <Label className="text-base">Roles to Display</Label><p className="text-sm text-muted-foreground mb-2">Select the roles to feature on the flyer.</p>
-                    <div className="max-h-60 overflow-y-auto space-y-2 border rounded-md p-4">
-                      {areRolesLoading && <p>Loading roles...</p>}
-                      {roleTemplates?.map((role) => (<div key={role.id} className="flex items-center gap-3 cursor-pointer p-1 rounded-md hover:bg-muted" onClick={() => toggleFlyerRole(role.name)}>{selectedFlyerRoles.has(role.name) ? (<CheckSquare className="h-5 w-5 text-brand-accent" />) : (<Square className="h-5 w-5 text-muted-foreground" />)}<span className="font-medium">{role.name}</span></div>))}
+
+                  {/* Download */}
+                  <Button onClick={handleSaveAsPdf} className="w-full" disabled={isGenerating}>
+                    {isGenerating ? "Generating..." : <><Download className="mr-2 h-4 w-4" />Save as PDF</>}
+                  </Button>
+                </div>
+
+                {/* ── Preview column ── */}
+                <div className="flex-1 min-w-0 w-full">
+                  <Label className="font-semibold block mb-2">Flyer Preview</Label>
+                  {/*
+                    Wrapper height = scaled flyer height so no clipping and no extra whitespace.
+                    Inner div is position:absolute so transform:scale() doesn't blow out the layout.
+                  */}
+                  <div
+                    ref={previewWrapperRef}
+                    className="w-full rounded-lg border bg-slate-100 relative overflow-hidden"
+                    style={{ height: FLYER_HEIGHT_PX * scaleFactor }}
+                  >
+                    <div style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      transform: `scale(${scaleFactor})`,
+                      transformOrigin: "top left",
+                      width: FLYER_WIDTH_PX,
+                      height: FLYER_HEIGHT_PX,
+                    }}>
+                      <FlyerContent
+                        churchProfile={churchProfile}
+                        selectedRoles={selectedFlyerRoles}
+                        signupUrl={signupUrl}
+                        logoDataUrl={logoDataUrl}
+                        primaryColor={churchProfile?.primaryColor || "#15803d"}
+                        fontFamily={churchProfile?.fontFamily || "Inter"}
+                        flyerImageUrl={flyerImageUrl}
+                        defaultHeroImageUrl={selectedStockImageUrl}
+                      />
                     </div>
                   </div>
                 </div>
-                <div className="md:col-span-2">
-                  <Label className="text-base">Flyer Preview</Label>
-                  <div ref={previewWrapperRef} className="mt-2 w-full overflow-hidden rounded-lg border bg-slate-200" style={{ aspectRatio: `${FLYER_ASPECT_RATIO}` }}>
-                    <div style={{ transform: `scale(${scaleFactor})`, transformOrigin: "top left" }}><FlyerContent churchProfile={churchProfile} selectedRoles={selectedFlyerRoles} signupUrl={signupUrl} logoDataUrl={logoDataUrl} primaryColor={churchProfile?.primaryColor || "#15803d"} fontFamily={churchProfile?.fontFamily || "Inter"} flyerImageUrl={flyerImageUrl} defaultHeroImageUrl={selectedStockImageUrl} /></div>
-                  </div>
-                </div>
+
               </CardContent>
-              <CardFooter className="gap-2"><Button onClick={handleSaveAsPdf} className="w-full sm:w-auto" disabled={isGenerating}>{isGenerating ? "Generating..." : (<><Download className="mr-2 h-4 w-4" />Save as PDF</>)}</Button></CardFooter>
             </Card>
           </TabsContent>
         </Tabs>

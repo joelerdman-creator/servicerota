@@ -134,7 +134,7 @@ export default function AssetsPage() {
       if (cat.key === "__other__") {
         result.__other__ = filtered.filter((a) => !KNOWN_ROLES.has(a.role));
       } else {
-        result[cat.key] = filtered.filter((a) => cat.roles?.includes(a.role as any));
+        result[cat.key] = filtered.filter((a) => (cat.roles as readonly string[] | null)?.includes(a.role));
       }
     }
     return result;

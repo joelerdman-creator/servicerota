@@ -67,7 +67,7 @@ type CategoryFilter = (typeof CATEGORIES)[number];
 
 const STATUS_VARIANT: Record<string, "warning" | "secondary" | "default" | "outline"> = {
   Open: "warning",
-  "In Progress": "info",
+  "In Progress": "secondary",
   Closed: "default",
 };
 

@@ -84,6 +84,9 @@ export interface Volunteer {
   lastName: string;
   email: string | null;
   photoURL?: string;
+  phone?: string;
+  smsOptIn?: boolean;
+  smsOptInAt?: any;
   availableRoleIds?: string[];
   availableRecurringEventSeriesIds?: string[];
   assignmentHistory?: { roleTemplateId: string; date: string }[];

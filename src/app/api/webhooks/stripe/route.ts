@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
           subscriptionId: subscription.id,
           subscriptionStatus: subscription.status,
           planId,
-          currentPeriodEnd: subscription.current_period_end,
+          currentPeriodEnd: (subscription as any).current_period_end,
         });
         break;
       }
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
           subscriptionId: subscription.id,
           subscriptionStatus: subscription.status,
           planId,
-          currentPeriodEnd: subscription.current_period_end,
+          currentPeriodEnd: (subscription as any).current_period_end,
         });
         break;
       }

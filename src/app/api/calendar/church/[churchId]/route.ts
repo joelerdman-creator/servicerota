@@ -72,7 +72,7 @@ export async function GET(
       const endDate = new Date(eventDate.getTime() + 60 * 60 * 1000);
 
       calendar.createEvent({
-        uid: `${eventDoc.id}@parishscribe`,
+        id: `${eventDoc.id}@parishscribe`,
         start: eventDate,
         end: endDate,
         summary: event.eventName,

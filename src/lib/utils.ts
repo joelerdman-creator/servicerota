@@ -10,13 +10,15 @@ export function cn(...inputs: ClassValue[]) {
  * a server action or scheduling engine. Converts Timestamp fields to ISO strings
  * and ensures assignmentHistory defaults to [].
  */
-export function normalizeVolunteerForScheduling<T extends Record<string, any>>(v: T): T {
+export function normalizeVolunteerForScheduling<T extends Record<string, any>>(
+  v: T
+): T & { assignmentHistory: { roleTemplateId: string; date: string }[] } {
   const out: any = { ...v };
   if (out.createdAt && typeof out.createdAt.toDate === "function") {
     out.createdAt = out.createdAt.toDate().toISOString();
   }
   out.assignmentHistory = Array.isArray(out.assignmentHistory) ? out.assignmentHistory : [];
-  return out as T;
+  return out;
 }
 
 export function getServiceColor(serviceId: string) {

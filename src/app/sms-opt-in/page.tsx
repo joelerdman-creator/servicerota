@@ -54,7 +54,7 @@ export default function SmsOptInPage() {
               <div className="flex gap-2"><dt className="text-muted-foreground w-36 shrink-0">Number type</dt><dd className="text-foreground font-medium">Toll-free (800-series)</dd></div>
               <div className="flex gap-2"><dt className="text-muted-foreground w-36 shrink-0">Message types</dt><dd className="text-foreground font-medium">Assignment confirmations, service reminders, substitution requests</dd></div>
               <div className="flex gap-2"><dt className="text-muted-foreground w-36 shrink-0">Frequency</dt><dd className="text-foreground font-medium">Varies — typically 2–8 messages/month</dd></div>
-              <div className="flex gap-2"><dt className="text-muted-foreground w-36 shrink-0">Support</dt><dd className="text-foreground font-medium"><a href="mailto:support@parishscribe.com" className="underline underline-offset-2 hover:text-primary">support@parishscribe.com</a></dd></div>
+              <div className="flex gap-2"><dt className="text-muted-foreground w-36 shrink-0">Support</dt><dd className="text-foreground font-medium"><a href="mailto:admin@parishscribe.com" className="underline underline-offset-2 hover:text-primary">admin@parishscribe.com</a></dd></div>
             </dl>
           </div>
 
@@ -136,7 +136,7 @@ export default function SmsOptInPage() {
           <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground space-y-1">
             <p className="font-semibold text-foreground">Opting out</p>
             <p>Reply <strong>STOP</strong> to any message to cancel immediately. You can also disable SMS notifications at any time from your profile settings.</p>
-            <p>Reply <strong>HELP</strong> for help, or contact <a href="mailto:support@parishscribe.com" className="underline underline-offset-2 hover:text-foreground">support@parishscribe.com</a>.</p>
+            <p>Reply <strong>HELP</strong> for help, or contact <a href="mailto:admin@parishscribe.com" className="underline underline-offset-2 hover:text-foreground">admin@parishscribe.com</a>.</p>
           </div>
 
           {/* CTA */}

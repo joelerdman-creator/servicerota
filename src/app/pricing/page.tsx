@@ -234,7 +234,7 @@ export default function PricingPage() {
           <Feather className="h-4 w-4 text-brand-accent" />
           <span className="font-semibold text-foreground">Parish Scribe</span>
         </div>
-        <p>© {new Date().getFullYear()} Parish Scribe. Built for faith communities.</p>
+        <p>© {new Date().getFullYear()} Joel Erdman dba ParishScribe. Built for faith communities.</p>
       </footer>
     </div>
   );

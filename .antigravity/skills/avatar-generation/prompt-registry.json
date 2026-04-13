@@ -1,0 +1,55 @@
+{
+  "master_style_anchor": "sleek minimalist geometric modern flat vector illustration style, sophisticated corporate tech aesthetic, elegant muted color palette, clean vector shapes without black outlines, character is set inside an evocative church or sanctuary environment with visible pews, stained glass, or warm architectural lighting in the background, 1:1 aspect ratio square composition, profile picture layout",
+  "liturgical_roles": {
+    "Crucifer / Acolyte": {
+      "male": "A sincere male young teenager in a white alb carrying a tall processional cross down a stone center aisle",
+      "female": "A sincere female young teenager in a white alb carrying a tall processional cross down a stone center aisle"
+    },
+    "Chalicist": {
+      "male": "A reverent male adult holding a golden chalice near a high altar with glowing candles",
+      "female": "A reverent female adult holding a golden chalice near a high altar with glowing candles"
+    },
+    "Lector": {
+      "male": "A dignified male adult reading from an ornate brass eagle lectern",
+      "female": "A dignified female adult reading from an ornate brass eagle lectern"
+    },
+    "Verger": {
+      "male": "A distinguished male adult holding a wooden verge guiding a procession near wooden pews",
+      "female": "A distinguished female adult holding a wooden verge guiding a procession near wooden pews"
+    },
+    "Altar Guild": {
+      "male": "A dedicated male adult arranging pristine linens near a sanctuary rail and altar",
+      "female": "A dedicated female adult arranging pristine linens near a sanctuary rail and altar"
+    },
+    "Usher": {
+      "male": "A confident male adult wearing a neat suit handing out bulletins at heavy wooden sanctuary doors",
+      "female": "A confident female adult wearing a neat blazer handing out bulletins at heavy wooden sanctuary doors"
+    }
+  },
+  "modern_roles": {
+    "Worship Band": {
+      "male": "A passionate male adult holding an acoustic guitar on a darkly lit worship stage with modern spotlights",
+      "female": "A passionate female adult singing into a microphone on a darkly lit worship stage with modern spotlights"
+    },
+    "Connect Center Host": {
+      "male": "A welcoming male adult standing in a contemporary brightly lit church lobby handing over a visitor's packet",
+      "female": "A welcoming female adult standing in a contemporary brightly lit church lobby holding an information ipad"
+    },
+    "Production Tech": {
+      "male": "A focused male adult wearing a headset sitting at a glowing sound mixing console with a large stage in the background",
+      "female": "A focused female adult wearing a headset sitting at a glowing lighting console with a large stage in the background"
+    },
+    "Kids Church Leader": {
+      "male": "An enthusiastic male adult surrounded by vibrant colors in a modern brightly lit children's ministry auditorium",
+      "female": "An enthusiastic female adult surrounded by vibrant colors pointing at a modern interactive screen in a children's ministry auditorium"
+    },
+    "Youth Mentor": {
+      "male": "A relatable male young adult in a hoodie sitting in a circle of chairs in a modern student center",
+      "female": "A relatable female young adult wearing a graphic tee laughing in a modern student room"
+    },
+    "Greeting Team": {
+      "male": "A cheerful male adult standing outside modern glass church doors giving a friendly wave",
+      "female": "A cheerful female adult standing outside modern glass church doors giving a bright smile"
+    }
+  }
+}

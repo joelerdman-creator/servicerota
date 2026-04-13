@@ -330,6 +330,10 @@ export default function JoinForm({ churchId, churchName, logoUrl, primaryColor, 
 
         </div>
       </main>
+
+      <footer className="border-t py-4 px-6 text-center text-xs text-gray-400">
+        &copy; {new Date().getFullYear()} Joel Erdman dba ParishScribe. All rights reserved.
+      </footer>
     </div>
   );
 }

@@ -688,9 +688,10 @@ export default function HomeClient() {
               <Link href="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
               <Link href="/login" className="hover:text-foreground transition-colors">Sign In</Link>
               <Link href="/signup" className="hover:text-foreground transition-colors">Sign Up</Link>
+              <Link href="/sms-opt-in" className="hover:text-foreground transition-colors">SMS Opt-In</Link>
             </div>
             <p className="text-xs text-muted-foreground">
-              © {new Date().getFullYear()} Parish Scribe. All rights reserved.
+              © {new Date().getFullYear()} Joel Erdman dba ParishScribe. All rights reserved.
             </p>
           </div>
         </div>

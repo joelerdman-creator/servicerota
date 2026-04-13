@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Users, LifeBuoy, ImageIcon, TrendingUp, AlertCircle, Loader2 } from "lucide-react";
+import { Building2, Users, LifeBuoy, ImageIcon, TrendingUp, AlertCircle, Loader2, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { PLANS, PlanId } from "@/lib/plans";
@@ -256,6 +256,7 @@ export default function SuperUserDashboardPage() {
           { href: "/dashboard/superuser/users", icon: Users, label: "Manage Users" },
           { href: "/dashboard/superuser/tickets", icon: LifeBuoy, label: "Support Tickets" },
           { href: "/dashboard/superuser/assets", icon: ImageIcon, label: "Image Assets" },
+          { href: "/dashboard/superuser/sms-compliance", icon: MessageSquare, label: "SMS Compliance" },
         ].map(({ href, icon: Icon, label }) => (
           <Link key={href} href={href}>
             <Card className="hover:bg-muted/50 transition-colors cursor-pointer text-center py-6">

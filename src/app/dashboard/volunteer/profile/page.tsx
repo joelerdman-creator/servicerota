@@ -324,20 +324,32 @@ export default function VolunteerProfilePage() {
               <p className="text-xs text-muted-foreground">US numbers only. Standard message & data rates may apply.</p>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <Label htmlFor="sms-opt-in" className="text-base font-medium cursor-pointer">
-                  Enable text message notifications
-                </Label>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  By enabling this, you consent to receive automated SMS notifications from Parish Scribe.
-                </p>
+            <div className="rounded-lg border p-4 space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor="sms-opt-in" className="text-base font-medium cursor-pointer">
+                    Enable text message notifications
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    By enabling this, I consent to receive recurring automated SMS text messages
+                    from <strong>Parish Scribe (Joel Erdman dba ParishScribe)</strong> including
+                    assignment confirmations, service reminders, and substitution requests.
+                  </p>
+                </div>
+                <Switch
+                  id="sms-opt-in"
+                  checked={smsOptIn}
+                  onCheckedChange={setSmsOptIn}
+                />
               </div>
-              <Switch
-                id="sms-opt-in"
-                checked={smsOptIn}
-                onCheckedChange={setSmsOptIn}
-              />
+              <p className="text-xs text-muted-foreground leading-snug">
+                Message and data rates may apply. Message frequency varies (typically 2–8/month).
+                Reply <strong>STOP</strong> to cancel, <strong>HELP</strong> for help.
+                Consent is not required to use Parish Scribe. See our{" "}
+                <a href="/privacy" className="underline underline-offset-2 hover:text-foreground">Privacy Policy</a>
+                {" "}and{" "}
+                <a href="/terms" className="underline underline-offset-2 hover:text-foreground">Terms of Service</a>.
+              </p>
             </div>
 
             {userProfile?.smsOptIn && userProfile?.smsOptInAt && (

@@ -254,20 +254,32 @@ export default function JoinForm({ churchId, churchName, logoUrl, primaryColor, 
                 placeholder="(555) 000-0000"
               />
               {phone && (
-                <div
-                  className="flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 transition-colors"
-                  onClick={() => setSmsOptIn((v) => !v)}
-                >
-                  <Checkbox
-                    id="smsOptIn"
-                    checked={smsOptIn}
-                    onCheckedChange={(v) => setSmsOptIn(Boolean(v))}
-                    className="mt-0.5 shrink-0"
-                  />
-                  <Label htmlFor="smsOptIn" className="text-sm cursor-pointer font-normal text-gray-600 leading-snug">
-                    I'd like to receive text message reminders for my assignments.
-                    <span className="block text-xs text-gray-400 mt-0.5">Standard messaging rates may apply.</span>
-                  </Label>
+                <div className="rounded-lg border bg-gray-50 p-3 space-y-2">
+                  <div
+                    className="flex items-start gap-2.5 cursor-pointer"
+                    onClick={() => setSmsOptIn((v) => !v)}
+                  >
+                    <Checkbox
+                      id="smsOptIn"
+                      checked={smsOptIn}
+                      onCheckedChange={(v) => setSmsOptIn(Boolean(v))}
+                      className="mt-0.5 shrink-0"
+                    />
+                    <Label htmlFor="smsOptIn" className="text-sm cursor-pointer font-normal text-gray-700 leading-snug">
+                      By checking this box, I consent to receive recurring automated SMS text messages
+                      from <strong>Parish Scribe (Joel Erdman dba ParishScribe)</strong> at the mobile
+                      number provided, including assignment confirmations, service reminders, and
+                      substitution requests. Consent is not required to volunteer.
+                    </Label>
+                  </div>
+                  <p className="text-xs text-gray-400 leading-snug pl-6">
+                    Message and data rates may apply. Message frequency varies (typically 2–8/month).
+                    Reply <strong>STOP</strong> to cancel, <strong>HELP</strong> for help.
+                    See our{" "}
+                    <a href="/privacy" className="underline underline-offset-2 hover:text-gray-600">Privacy Policy</a>
+                    {" "}and{" "}
+                    <a href="/terms" className="underline underline-offset-2 hover:text-gray-600">Terms of Service</a>.
+                  </p>
                 </div>
               )}
             </div>

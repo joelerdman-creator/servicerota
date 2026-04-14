@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useFirestore, WithId, useAuth, useUser } from "@/firebase";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import {
   collection,
   query,
@@ -64,7 +65,7 @@ interface ChurchOption {
   name: string;
 }
 
-export default function SuperUserUsersPage() {
+function SuperUserUsersPageContent() {
   const firestore = useFirestore();
   const auth = useAuth();
   const { user: superUser } = useUser();
@@ -390,5 +391,13 @@ export default function SuperUserUsersPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function SuperUserUsersPage() {
+  return (
+    <Suspense fallback={null}>
+      <SuperUserUsersPageContent />
+    </Suspense>
   );
 }

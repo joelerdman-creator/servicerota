@@ -43,6 +43,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import {
   Select,
   SelectContent,
@@ -77,7 +78,7 @@ const PRIORITY_VARIANT: Record<string, "outline" | "warning" | "destructive"> = 
   Critical: "destructive",
 };
 
-export default function SupportPage() {
+function SupportPageContent() {
   const firestore = useFirestore();
   const { user } = useUser();
   const [subject, setSubject] = useState("");
@@ -341,5 +342,13 @@ export default function SupportPage() {
         </footer>
       </div>
     </div>
+  );
+}
+
+export default function SupportPage() {
+  return (
+    <Suspense fallback={null}>
+      <SupportPageContent />
+    </Suspense>
   );
 }

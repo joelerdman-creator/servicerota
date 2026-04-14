@@ -40,14 +40,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useDebounce } from "@/hooks/use-debounce";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense } from "react";
 import { useVolunteers } from "./hooks/useVolunteers";
 import { VolunteerList } from "./components/VolunteerList";
 import { VolunteerManagementSheet } from "./components/VolunteerManagementSheet";
 import { AddVolunteerDialog, AddVolunteerData } from "./components/AddVolunteerDialog";
 import { AdminProfile, ChurchProfile, Volunteer, RecurringService } from "./types";
 
-export default function VolunteersPage() {
+function VolunteersPageContent() {
   const firestore = useFirestore();
   const { user } = useUser();
   const searchParams = useSearchParams();
@@ -678,5 +679,13 @@ export default function VolunteersPage() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+export default function VolunteersPage() {
+  return (
+    <Suspense fallback={null}>
+      <VolunteersPageContent />
+    </Suspense>
   );
 }

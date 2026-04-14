@@ -3,7 +3,7 @@
 // It is intentionally simple and does not use the main app layout.
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { useCollection, useDoc, useFirestore, useMemoFirebase, WithId, FirebaseClientProvider } from "@/firebase";
 import { collection, doc, query, where, orderBy, getDoc, getDocs } from "firebase/firestore";
 import { useParams, useSearchParams } from "next/navigation";
@@ -237,7 +237,9 @@ function EmbeddedSchedulePage() {
 export default function EmbeddedScheduleProviderWrapper() {
   return (
     <FirebaseClientProvider>
-      <EmbeddedSchedulePage />
+      <Suspense fallback={null}>
+        <EmbeddedSchedulePage />
+      </Suspense>
     </FirebaseClientProvider>
   );
 }

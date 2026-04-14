@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
@@ -59,17 +59,8 @@ const PLAN_DISPLAY = [
 
 const PLAN_ORDER: PlanId[] = ["free", "pro", "growth", "multi_site"];
 
-export default function BillingPage() {
-  const { user, isUserLoading } = useUser();
-  const firestore = useFirestore();
+function SearchParamsHandler() {
   const searchParams = useSearchParams();
-  const [isLoadingPortal, setIsLoadingPortal] = useState(false);
-  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
-  const [changePlanLoading, setChangePlanLoading] = useState<string | null>(null);
-  const [isCanceling, setIsCanceling] = useState(false);
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [interval, setInterval] = useState<"monthly" | "annual">("monthly");
-
   useEffect(() => {
     if (searchParams.get("success") === "true") {
       toast.success("Subscription activated! Welcome aboard.");
@@ -78,6 +69,18 @@ export default function BillingPage() {
       toast("Checkout canceled — no changes were made.", { icon: "ℹ️" });
     }
   }, [searchParams]);
+  return null;
+}
+
+export default function BillingPage() {
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
+  const [isLoadingPortal, setIsLoadingPortal] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [changePlanLoading, setChangePlanLoading] = useState<string | null>(null);
+  const [isCanceling, setIsCanceling] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [interval, setInterval] = useState<"monthly" | "annual">("monthly");
 
   const userDocRef = useMemoFirebase(
     () => (user?.uid && firestore ? doc(firestore, "users", user.uid) : null),
@@ -195,6 +198,9 @@ export default function BillingPage() {
 
   return (
     <div className="flex flex-col gap-8 max-w-4xl">
+      <Suspense fallback={null}>
+        <SearchParamsHandler />
+      </Suspense>
       <PageHeader
         title="Billing & Plan"
         description="Manage your Parish Scribe subscription."

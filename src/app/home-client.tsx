@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import AppRouter from "@/components/AppRouter";
 import { useUser } from "@/firebase";
 import {
   Users, Mail, Zap, Feather, CalendarDays, CheckCircle2,
@@ -425,18 +425,13 @@ function AppMockup({ compact = false }: { compact?: boolean }) {
 
 export default function HomeClient() {
   const { user, isUserLoading } = useUser();
+  const router = useRouter();
 
-  if (isUserLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="animate-spin h-10 w-10 border-4 border-primary rounded-full border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (user) {
-    return <AppRouter />;
-  }
+  useEffect(() => {
+    if (!isUserLoading && user) {
+      router.replace("/dashboard");
+    }
+  }, [user, isUserLoading, router]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">

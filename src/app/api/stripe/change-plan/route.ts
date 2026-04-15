@@ -48,15 +48,15 @@ export async function POST(request: NextRequest) {
     const churchId: string = userDoc.data()?.churchId;
     if (!churchId) return NextResponse.json({ error: "No church found" }, { status: 400 });
 
-    const churchDoc = await firestore.collection("churches").doc(churchId).get();
-    const church = churchDoc.data();
-    if (!church?.subscriptionId) return NextResponse.json({ error: "No active subscription" }, { status: 400 });
+    const billingDoc = await firestore.collection("churches").doc(churchId).collection("billing").doc("config").get();
+    const billing = billingDoc.data();
+    if (!billing?.subscriptionId) return NextResponse.json({ error: "No active subscription" }, { status: 400 });
 
-    const subscription = await getStripe().subscriptions.retrieve(church.subscriptionId);
+    const subscription = await getStripe().subscriptions.retrieve(billing.subscriptionId);
     const itemId = subscription.items.data[0]?.id;
     const newPriceId = plan.prices[interval].trim();
 
-    await getStripe().subscriptions.update(church.subscriptionId, {
+    await getStripe().subscriptions.update(billing.subscriptionId, {
       items: [{ id: itemId, price: newPriceId }],
       proration_behavior: "create_prorations",
     });

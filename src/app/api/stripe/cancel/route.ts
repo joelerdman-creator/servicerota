@@ -37,11 +37,11 @@ export async function POST(request: NextRequest) {
     const churchId: string = userDoc.data()?.churchId;
     if (!churchId) return NextResponse.json({ error: "No church found" }, { status: 400 });
 
-    const churchDoc = await firestore.collection("churches").doc(churchId).get();
-    const church = churchDoc.data();
-    if (!church?.subscriptionId) return NextResponse.json({ error: "No active subscription" }, { status: 400 });
+    const billingDoc = await firestore.collection("churches").doc(churchId).collection("billing").doc("config").get();
+    const billing = billingDoc.data();
+    if (!billing?.subscriptionId) return NextResponse.json({ error: "No active subscription" }, { status: 400 });
 
-    await getStripe().subscriptions.update(church.subscriptionId, {
+    await getStripe().subscriptions.update(billing.subscriptionId, {
       cancel_at_period_end: true,
     });
 

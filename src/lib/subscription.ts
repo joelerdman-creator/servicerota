@@ -4,8 +4,8 @@ export interface ChurchSubscription {
   planId?: PlanId;
   subscriptionStatus?: string;
   currentPeriodEnd?: number;
-  stripeCustomerId?: string;
-  subscriptionId?: string;
+  /** True once a Stripe customer exists. Sensitive IDs are in the billing subcollection. */
+  hasStripeCustomer?: boolean;
   smsMonthlyLimit?: number;
 }
 

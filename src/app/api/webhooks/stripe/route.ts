@@ -51,13 +51,21 @@ export async function POST(request: NextRequest) {
         const priceId = subscription.items.data[0]?.price.id;
         const planId = planIdFromPriceId(priceId);
 
-        await firestore.collection("churches").doc(churchId).update({
-          stripeCustomerId: session.customer as string,
-          subscriptionId: subscription.id,
-          subscriptionStatus: subscription.status,
-          planId,
-          currentPeriodEnd: (subscription as any).current_period_end,
-        });
+        const churchRef = firestore.collection("churches").doc(churchId);
+        await Promise.all([
+          // Non-sensitive fields stay on the church doc (used for feature gating).
+          churchRef.update({
+            subscriptionStatus: subscription.status,
+            planId,
+            currentPeriodEnd: (subscription as any).current_period_end,
+            hasStripeCustomer: true,
+          }),
+          // Sensitive Stripe identifiers live in the billing subcollection.
+          churchRef.collection("billing").doc("config").set({
+            stripeCustomerId: session.customer as string,
+            subscriptionId: subscription.id,
+          }, { merge: true }),
+        ]);
         break;
       }
 
@@ -69,12 +77,17 @@ export async function POST(request: NextRequest) {
         const priceId = subscription.items.data[0]?.price.id;
         const planId = planIdFromPriceId(priceId);
 
-        await firestore.collection("churches").doc(churchId).update({
-          subscriptionId: subscription.id,
-          subscriptionStatus: subscription.status,
-          planId,
-          currentPeriodEnd: (subscription as any).current_period_end,
-        });
+        const churchRef = firestore.collection("churches").doc(churchId);
+        await Promise.all([
+          churchRef.update({
+            subscriptionStatus: subscription.status,
+            planId,
+            currentPeriodEnd: (subscription as any).current_period_end,
+          }),
+          churchRef.collection("billing").doc("config").set({
+            subscriptionId: subscription.id,
+          }, { merge: true }),
+        ]);
         break;
       }
 
@@ -83,25 +96,32 @@ export async function POST(request: NextRequest) {
         const churchId = subscription.metadata?.churchId;
         if (!churchId) break;
 
-        await firestore.collection("churches").doc(churchId).update({
-          subscriptionStatus: "canceled",
-          planId: "free",
-          subscriptionId: null,
-          currentPeriodEnd: null,
-        });
+        const churchRef = firestore.collection("churches").doc(churchId);
+        await Promise.all([
+          churchRef.update({
+            subscriptionStatus: "canceled",
+            planId: "free",
+            currentPeriodEnd: null,
+            hasStripeCustomer: false,
+          }),
+          churchRef.collection("billing").doc("config").set({
+            subscriptionId: null,
+          }, { merge: true }),
+        ]);
         break;
       }
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
         if (!invoice.customer) break;
+        // Look up the church via the billing subcollection (stripeCustomerId no longer on church doc).
         const snap = await firestore
-          .collection("churches")
+          .collectionGroup("billing")
           .where("stripeCustomerId", "==", invoice.customer as string)
           .limit(1)
           .get();
         if (!snap.empty) {
-          await snap.docs[0].ref.update({ subscriptionStatus: "past_due" });
+          await snap.docs[0].ref.parent.parent!.update({ subscriptionStatus: "past_due" });
         }
         break;
       }
@@ -110,12 +130,12 @@ export async function POST(request: NextRequest) {
         const invoice = event.data.object as Stripe.Invoice;
         if (!invoice.customer || invoice.billing_reason === "subscription_create") break;
         const snap = await firestore
-          .collection("churches")
+          .collectionGroup("billing")
           .where("stripeCustomerId", "==", invoice.customer as string)
           .limit(1)
           .get();
         if (!snap.empty) {
-          await snap.docs[0].ref.update({ subscriptionStatus: "active" });
+          await snap.docs[0].ref.parent.parent!.update({ subscriptionStatus: "active" });
         }
         break;
       }

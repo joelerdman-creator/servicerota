@@ -10,86 +10,120 @@ service cloud.firestore {
 
     function isSuperUser() {
       // superUser status is determined SOLELY by the custom claim.
-      return request.auth.token.superUser == true;
+      return request.auth != null && request.auth.token.superUser == true;
     }
-    
+
     function isRequestingUser(userId) {
-        return isSignedIn() && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     // Checks if the requesting user is an admin of the specified church.
     function isChurchAdmin(churchId) {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             userDoc.data.isAdmin == true &&
-             userDoc.data.churchId == churchId;
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.churchId == churchId;
     }
 
     // Checks if the requesting user is an active member (volunteer or admin) of the specified church.
     function isChurchMember(churchId) {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             userDoc.data.churchId == churchId &&
-             userDoc.data.status == "active";
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.churchId == churchId &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == "active";
     }
-    
+
+    // Blocks self-updates from granting elevated privileges.
+    // A user updating their own profile may NOT change these sensitive fields.
+    function isSelfUpdateSafe() {
+      let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      return !changedKeys.hasAny(['isAdmin', 'role', 'churchId', 'status', 'isManagedByAdmin']);
+    }
+
+    // Ensures a user creating their own profile cannot grant themselves admin privileges.
+    function isSafeNewUserProfile() {
+      return request.resource.data.get('isAdmin', false) == false &&
+             request.resource.data.get('isManagedByAdmin', false) == false;
+    }
+
     // --- USER PROFILES ---
     match /users/{userId} {
-      allow get: if isSuperUser() || isRequestingUser(userId) || isChurchAdmin(resource.data.churchId);
-      // IMPORTANT: This list rule allows queries on the users collection. 
-      // The queries themselves MUST be secured with where() clauses in the client code.
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSuperUser() || isRequestingUser(userId) || isChurchAdmin(resource.data.churchId);
+      // Authenticated users can read their own doc or admins can read their church members.
+      // Pending invitation reads are now handled via the /invitations collection (no UID exposed).
+      allow get: if isSuperUser() ||
+                    isRequestingUser(userId) ||
+                    isChurchAdmin(resource.data.churchId);
+
+      // Restrict list to superusers and admins only — prevents any signed-in user
+      // from querying the entire users collection.
+      allow list: if isSuperUser() ||
+                     (isSignedIn() &&
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
+
+      // Users can create their own profile doc, but cannot self-grant admin/managed flags.
+      // Church admins can create managed volunteer profiles.
+      allow create: if isSuperUser() ||
+                       isChurchAdmin(request.resource.data.churchId) ||
+                       (isSignedIn() && request.auth.uid == userId && isSafeNewUserProfile());
+
+      // Users can update their own profile, but CANNOT escalate their own privileges.
+      // Admins can update members of their church but CANNOT change the churchId. SuperUser can update anyone.
+      allow update: if isSuperUser() ||
+                       (isChurchAdmin(resource.data.churchId) && request.resource.data.get('churchId', resource.data.churchId) == resource.data.churchId) ||
+                       (isRequestingUser(userId) && isSelfUpdateSafe());
+
       allow delete: if isSuperUser() || isChurchAdmin(resource.data.churchId);
     }
 
     // --- CHURCH DATA & SUBCOLLECTIONS ---
     match /churches/{churchId} {
-      // Public get for widget/embed pages; subscription fields (planId, etc.) are non-sensitive
+      // Public get for widget/embed pages; subscription fields (planId, etc.) are non-sensitive.
       allow get: if true;
       allow list: if isSuperUser();
       allow create: if isSuperUser() || (isSignedIn() && request.resource.data.ownerId == request.auth.uid);
-      // Only admins can update — protects planId, stripeCustomerId, etc. from client tampering
-      allow update: if isSuperUser() || isChurchAdmin(churchId);
+      // Only admins can update — protects planId, stripeCustomerId, etc. from client tampering.
+      allow update: if isSuperUser() || 
+                       (isChurchAdmin(churchId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['planId', 'stripeCustomerId', 'stripeSubscriptionId', 'subscriptionStatus']));
 
       // --- EVENTS ---
       match /events/{eventId} {
-        // Admins can read all events. Active members can list events (needed to
-        // discover recurring series for preferences). Individual unpublished event
-        // gets are restricted to admins.
-        allow list: if isSuperUser() || isChurchAdmin(churchId) || isChurchMember(churchId);
+        allow list: if isSuperUser() || isChurchAdmin(churchId) || isChurchMember(churchId) || resource.data.isPublished == true;
         allow get: if resource.data.isPublished == true || isSuperUser() || isChurchAdmin(churchId);
         allow write: if isSuperUser() || isChurchAdmin(churchId);
 
         // --- ROLES ---
         match /roles/{roleId} {
-            function isSigningUpForOpenRole() {
-                let event = get(/databases/$(database)/documents/churches/$(churchId)/events/$(eventId));
-                // Allow update if the event is a sign-up event, the role is currently unassigned,
-                // and the user is assigning themselves.
-                return event.data.isSignupEnabled == true &&
-                       resource.data.assignedVolunteerId == null &&
-                       request.resource.data.assignedVolunteerId == request.auth.uid &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedVolunteerId', 'assignedVolunteerName', 'status']);
-            }
+          function isSigningUpForOpenRole() {
+            let event = get(/databases/$(database)/documents/churches/$(churchId)/events/$(eventId));
+            return isChurchMember(churchId) &&
+                   event.data.isSignupEnabled == true &&
+                   resource.data.assignedVolunteerId == null &&
+                   request.resource.data.assignedVolunteerId == request.auth.uid &&
+                   request.resource.data.diff(resource.data).affectedKeys()
+                     .hasOnly(['assignedVolunteerId', 'assignedVolunteerName', 'status']);
+          }
 
-            function isClaimingSubstitution() {
-                return resource.data.status == "Pending Substitution" &&
-                       request.resource.data.assignedVolunteerId == request.auth.uid &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedVolunteerId', 'assignedVolunteerName', 'status']);
-            }
+          // Fixed: include 'originalVolunteerId' since the claim flow sets it to null.
+          function isClaimingSubstitution() {
+            return isChurchMember(churchId) &&
+                   resource.data.status == "Pending Substitution" &&
+                   request.resource.data.assignedVolunteerId == request.auth.uid &&
+                   request.resource.data.diff(resource.data).affectedKeys()
+                     .hasOnly(['assignedVolunteerId', 'assignedVolunteerName', 'status', 'originalVolunteerId']);
+          }
 
-            allow read, list: if get(/databases/$(database)/documents/churches/$(churchId)/events/$(eventId)).data.isPublished == true || isChurchAdmin(churchId);
-            allow create, delete: if isChurchAdmin(churchId);
-            allow update: if isChurchAdmin(churchId) || isSigningUpForOpenRole() || isClaimingSubstitution() ||
-                          (isRequestingUser(resource.data.assignedVolunteerId) && 
-                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
+          allow read, list: if get(/databases/$(database)/documents/churches/$(churchId)/events/$(eventId)).data.isPublished == true ||
+                               isChurchAdmin(churchId);
+          allow create, delete: if isChurchAdmin(churchId);
+          allow update: if isChurchAdmin(churchId) ||
+                           isSigningUpForOpenRole() ||
+                           isClaimingSubstitution() ||
+                           (isRequestingUser(resource.data.assignedVolunteerId) &&
+                            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
         }
       }
 
       // --- TEMPLATES ---
-      // Volunteers need to read role_templates to see what roles they can request.
       match /role_templates/{roleTemplateId} {
         allow read: if isSuperUser() || isChurchMember(churchId);
         allow write: if isSuperUser() || isChurchAdmin(churchId);
@@ -98,14 +132,13 @@ service cloud.firestore {
       match /service_templates/{serviceTemplateId} {
         allow read, write: if isSuperUser() || isChurchAdmin(churchId);
       }
-      
+
       match /series_metadata/{seriesId} {
         allow read, write: if isSuperUser() || isChurchAdmin(churchId);
       }
 
       // --- ROLE REQUESTS ---
       match /role_requests/{requestId} {
-        // Admins can read and manage all requests for their church.
         allow read, list: if isSuperUser() || isChurchAdmin(churchId);
         allow update, delete: if isSuperUser() || isChurchAdmin(churchId);
 
@@ -114,15 +147,42 @@ service cloud.firestore {
                          request.resource.data.volunteerId == request.auth.uid &&
                          request.resource.data.status == "pending";
 
-        // Volunteers can read and cancel (delete) their own requests.
+        // Volunteers can read and cancel (delete) their own pending requests.
+        // The list rule requires a where('volunteerId','==',uid) filter on the query.
         allow get: if isChurchMember(churchId) && resource.data.volunteerId == request.auth.uid;
-        allow list: if isChurchMember(churchId) && request.auth != null;
-        allow delete: if isChurchMember(churchId) && resource.data.volunteerId == request.auth.uid
-                         && resource.data.status == "pending";
+        allow list: if isSuperUser() ||
+                       isChurchAdmin(churchId) ||
+                       (isChurchMember(churchId) && resource.data.volunteerId == request.auth.uid);
+        allow delete: if isChurchMember(churchId) &&
+                         resource.data.volunteerId == request.auth.uid &&
+                         resource.data.status == "pending";
+      }
+
+      // --- TRADE REQUESTS ---
+      // Shift-swap requests between volunteers.
+      match /trade_requests/{tradeId} {
+        allow read, list: if isChurchAdmin(churchId) || isChurchMember(churchId);
+        allow create: if isChurchMember(churchId) &&
+                         request.resource.data.requesterId == request.auth.uid;
+        // Only the target volunteer can accept/decline; only status and updatedAt may change.
+        allow update: if isChurchAdmin(churchId) ||
+                         (isChurchMember(churchId) &&
+                          resource.data.targetVolunteerId == request.auth.uid &&
+                          request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['status', 'updatedAt']));
+        allow delete: if isChurchAdmin(churchId) ||
+                         (isChurchMember(churchId) && resource.data.requesterId == request.auth.uid);
+      }
+
+      // --- BILLING (sensitive Stripe identifiers) ---
+      // stripeCustomerId and subscriptionId live here, not on the church doc.
+      // The church doc keeps only planId / subscriptionStatus / hasStripeCustomer (non-sensitive).
+      match /billing/{billingDoc} {
+        allow read, write: if isSuperUser() || isChurchAdmin(churchId);
       }
 
       // --- USAGE COUNTERS (SMS caps etc.) ---
-      // Written server-side only; admins can read for dashboard display
+      // Written server-side only via Admin SDK; admins can read for dashboard display.
       match /usage/{monthKey} {
         allow read: if isChurchAdmin(churchId);
         allow write: if false;
@@ -131,11 +191,23 @@ service cloud.firestore {
       // --- NOTIFICATIONS ---
       match /notifications/{notificationId} {
         allow read, list: if isChurchAdmin(churchId);
-        // Writes are handled by server-side actions, so no client-side write access is needed.
-        allow write: if false; 
+        // Writes are handled by server-side actions only.
+        allow write: if false;
       }
     }
-    
+
+    // --- INVITATIONS ---
+    // Minimal invite data used by the claim-account page (unauthenticated).
+    // The doc ID is the opaque invite token embedded in the claim URL.
+    // No UID is exposed as a lookup key — the token IS the secret.
+    match /invitations/{inviteToken} {
+      allow get: if true;         // token is the secret; anyone with the link can read
+      // Admins create and delete invitations; no client may update an existing invite.
+      allow create, delete: if isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow update: if false;
+    }
+
     // --- GRAPHIC ASSETS ---
     // Global stock images used in church flyer/sharing pages.
     // Writes are server-side only (Admin SDK); client reads limited to signed-in admins.
@@ -149,15 +221,22 @@ service cloud.firestore {
     match /support_tickets/{ticketId} {
       allow create: if isSignedIn() && request.resource.data.submittedByUid == request.auth.uid;
       allow get: if isSuperUser() || (isSignedIn() && resource.data.submittedByUid == request.auth.uid);
-      allow list: if isSuperUser() || (isSignedIn() && resource.data.submittedByUid == request.auth.uid) || isChurchAdmin(resource.data.churchId);
-      allow update: if isSuperUser() || 
-                    (isSignedIn() && resource.data.submittedByUid == request.auth.uid && 
-                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'lastActivityAt']));
+      allow list: if isSuperUser() ||
+                     (isSignedIn() && resource.data.submittedByUid == request.auth.uid) ||
+                     isChurchAdmin(resource.data.churchId);
+      // Users can only close their own ticket (status change) — no other field edits.
+      allow update: if isSuperUser() ||
+                       (isSignedIn() &&
+                        resource.data.submittedByUid == request.auth.uid &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['status', 'lastActivityAt']));
       allow delete: if isSuperUser();
-      
+
       match /comments/{commentId} {
-        allow read, list: if isSuperUser() || (isSignedIn() && get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.submittedByUid == request.auth.uid);
-        allow create: if isSuperUser() || (isSignedIn() && get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.submittedByUid == request.auth.uid);
+        allow read, list: if isSuperUser() ||
+          (isSignedIn() && get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.submittedByUid == request.auth.uid);
+        allow create: if isSuperUser() ||
+          (isSignedIn() && get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.submittedByUid == request.auth.uid);
       }
     }
   }

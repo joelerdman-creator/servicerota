@@ -19,7 +19,8 @@ interface ChurchDoc {
   planId?: PlanId;
   subscriptionStatus?: string;
   currentPeriodEnd?: number;
-  stripeCustomerId?: string;
+  /** True once a Stripe customer has been created. Replaces stripeCustomerId (now in billing subcollection). */
+  hasStripeCustomer?: boolean;
   smsMonthlyLimit?: number;
 }
 
@@ -259,7 +260,7 @@ export default function BillingPage() {
             </span>
           </div>
         </CardContent>
-        {church?.stripeCustomerId && (
+        {church?.hasStripeCustomer && (
           <CardFooter className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={handleManageBilling} disabled={isLoadingPortal}>
               {isLoadingPortal ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}

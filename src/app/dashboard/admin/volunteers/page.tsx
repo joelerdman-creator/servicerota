@@ -10,7 +10,7 @@ import {
   useDoc,
   errorEmitter,
 } from "@/firebase";
-import { collection, query, doc, updateDoc, deleteDoc, arrayUnion, arrayRemove, addDoc, serverTimestamp, getDocs, where, limit, orderBy } from "firebase/firestore";
+import { collection, query, doc, updateDoc, deleteDoc, arrayUnion, arrayRemove, addDoc, setDoc, serverTimestamp, getDocs, where, limit, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
@@ -289,6 +289,18 @@ function VolunteersPageContent() {
     try {
       const newDocRef = await addDoc(collectionRef, volunteerData);
 
+      // Create a minimal invitation doc keyed by the same ID.
+      // The claim-account page reads this instead of the user doc, so no UID is exposed publicly.
+      const invitationData = {
+        userId: newDocRef.id,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        churchId: adminProfile.churchId,
+        isManagedByAdmin: !sendInvite,
+        status: sendInvite ? "pending_invitation" : "claimable",
+      };
+      await setDoc(doc(firestore, "invitations", newDocRef.id), invitationData);
+
       if (sendInvite) {
         await sendVolunteerInvite({
           type: "volunteer_invitation",
@@ -343,9 +355,11 @@ function VolunteersPageContent() {
 
   const handleDeny = async (volunteerId: string) => {
     if (!firestore) return;
-    const docRef = doc(firestore, "users", volunteerId);
     try {
-      await deleteDoc(docRef);
+      await Promise.all([
+        deleteDoc(doc(firestore, "users", volunteerId)),
+        deleteDoc(doc(firestore, "invitations", volunteerId)),
+      ]);
       refresh();
       toast.success("Pending user removed.");
     } catch (e) {

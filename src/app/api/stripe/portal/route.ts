@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No church found" }, { status: 400 });
   }
 
-  const churchDoc = await firestore.collection("churches").doc(churchId).get();
-  const stripeCustomerId: string = churchDoc.data()?.stripeCustomerId;
+  const billingDoc = await firestore.collection("churches").doc(churchId).collection("billing").doc("config").get();
+  const stripeCustomerId: string = billingDoc.data()?.stripeCustomerId;
   if (!stripeCustomerId) {
     return NextResponse.json({ error: "No billing account found" }, { status: 400 });
   }

@@ -38,11 +38,12 @@ interface ChurchDoc {
   address?: string;
   planId?: PlanId;
   subscriptionStatus?: string;
-  stripeCustomerId?: string;
-  subscriptionId?: string;
   currentPeriodEnd?: number;
   smsMonthlyLimit?: number;
   primaryColor?: string;
+  // Populated from billing subcollection after fetch
+  stripeCustomerId?: string;
+  subscriptionId?: string;
 }
 
 interface UserDoc {
@@ -92,8 +93,9 @@ export default function ChurchDetailPage() {
 
     const load = async () => {
       try {
-        const [churchSnap, usersSnap, ticketsSnap] = await Promise.all([
+        const [churchSnap, billingSnap, usersSnap, ticketsSnap] = await Promise.all([
           getDoc(doc(firestore, "churches", churchId)),
+          getDoc(doc(firestore, "churches", churchId, "billing", "config")),
           getDocs(query(collection(firestore, "users"), where("churchId", "==", churchId), orderBy("firstName"))),
           getDocs(
             query(
@@ -110,7 +112,13 @@ export default function ChurchDetailPage() {
           return;
         }
 
-        setChurch({ id: churchSnap.id, ...churchSnap.data() } as ChurchDoc);
+        const billing = billingSnap.exists() ? billingSnap.data() : {};
+        setChurch({
+          id: churchSnap.id,
+          ...churchSnap.data(),
+          stripeCustomerId: billing.stripeCustomerId,
+          subscriptionId: billing.subscriptionId,
+        } as ChurchDoc);
         setUsers(usersSnap.docs.map((d) => ({ id: d.id, ...d.data() } as UserDoc)));
         setTickets(ticketsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as TicketDoc)));
       } finally {

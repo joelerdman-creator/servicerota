@@ -22,13 +22,13 @@ import {
 } from "@/components/ui/card";
 
 interface PendingProfile {
+  /** The user doc ID to update after claiming. Matches the invite token. */
+  userId: string;
   firstName: string;
   lastName: string;
   churchId: string;
   isManagedByAdmin?: boolean;
-  status?: "pending_invitation" | "active";
-  /** True when the doc was created via the /join page claim flow */
-  claimable?: boolean;
+  status?: "pending_invitation" | "claimable";
 }
 
 function ClaimAccount() {
@@ -60,16 +60,15 @@ function ClaimAccount() {
     }
 
     const checkToken = async () => {
-      const userDocRef = doc(firestore, "users", token);
+      // Read from /invitations/{token} — public, but the token itself is the secret.
+      // The user doc is never exposed unauthenticated.
+      const inviteRef = doc(firestore, "invitations", token);
       try {
-        const userDoc = await getDoc(userDocRef);
-        const data = userDoc.data();
-        // Accept: (a) pending_invitation — standard admin invite flow
-        //         (b) active + isManagedByAdmin — admin-managed volunteer claiming via /join QR
+        const inviteDoc = await getDoc(inviteRef);
+        const data = inviteDoc.data();
         const isClaimable =
-          userDoc.exists() &&
-          (data?.status === "pending_invitation" ||
-            (data?.status === "active" && data?.isManagedByAdmin === true));
+          inviteDoc.exists() &&
+          (data?.status === "pending_invitation" || data?.status === "claimable");
         if (isClaimable) {
           setPendingProfile(data as PendingProfile);
         } else {
@@ -107,7 +106,8 @@ function ClaimAccount() {
         id: newUser.uid,
       };
 
-      const userDocToUpdateRef = doc(firestore, "users", token);
+      // pendingProfile.userId is the user doc ID (same as the invite token).
+      const userDocToUpdateRef = doc(firestore, "users", pendingProfile.userId);
 
       await updateProfile(newUser, {
         displayName: `${pendingProfile.firstName} ${pendingProfile.lastName}`,
@@ -127,9 +127,9 @@ function ClaimAccount() {
       setIsLoading(false);
       toast.error((e as Error).message || "Failed to claim account.");
       console.error(e);
-      if (token) {
+      if (pendingProfile?.userId) {
         const permissionError = new FirestorePermissionError({
-          path: `users/${token}`,
+          path: `users/${pendingProfile.userId}`,
           operation: "update",
         });
         errorEmitter.emit("permission-error", permissionError);

@@ -55,8 +55,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No church associated with account" }, { status: 400 });
     }
 
-    const churchDoc = await firestore.collection("churches").doc(churchId).get();
+    const [churchDoc, billingDoc] = await Promise.all([
+      firestore.collection("churches").doc(churchId).get(),
+      firestore.collection("churches").doc(churchId).collection("billing").doc("config").get(),
+    ]);
     const church = churchDoc.data() || {};
+    const billing = billingDoc.data() || {};
 
     const baseUrl = request.headers.get("origin") || process.env.NEXT_PUBLIC_BASE_URL || "";
     const priceId = plan.prices[interval];
@@ -66,8 +70,8 @@ export async function POST(request: NextRequest) {
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: true,
-      customer: church.stripeCustomerId || undefined,
-      customer_email: !church.stripeCustomerId ? (userDoc.data()?.email || undefined) : undefined,
+      customer: billing.stripeCustomerId || undefined,
+      customer_email: !billing.stripeCustomerId ? (userDoc.data()?.email || undefined) : undefined,
       metadata: { churchId },
       subscription_data: { metadata: { churchId } },
       success_url: `${baseUrl}/dashboard/admin/billing?success=true`,

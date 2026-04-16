@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import { Feather, MessageSquare, ShieldCheck, CheckCircle2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -89,9 +87,7 @@ export default function SmsOptInPage() {
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Volunteer registration form</p>
               <div className="rounded-lg border bg-gray-50 p-3 space-y-2">
                 <div className="flex items-start gap-2.5">
-                  <div className="mt-0.5 h-4 w-4 shrink-0 rounded border-2 border-primary bg-primary flex items-center justify-center">
-                    <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 10 10"><path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </div>
+                  <div className="mt-0.5 h-4 w-4 shrink-0 rounded border-2 border-gray-300 bg-white" />
                   <p className="text-sm text-gray-700 leading-snug">
                     By checking this box, I consent to receive recurring automated SMS text messages
                     from <strong>Parish Scribe (Joel Erdman dba ParishScribe)</strong> at the mobile
@@ -102,7 +98,7 @@ export default function SmsOptInPage() {
                 <p className="text-xs text-gray-400 leading-snug pl-6">
                   Message and data rates may apply. Message frequency varies (typically 2–8/month).
                   Reply <strong>STOP</strong> to cancel, <strong>HELP</strong> for help.
-                  See our <span className="underline">Privacy Policy</span> and <span className="underline">Terms of Service</span>.
+                  See our <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">Privacy Policy</Link> and <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">Terms of Service</Link>.
                 </p>
               </div>
             </div>
@@ -126,7 +122,7 @@ export default function SmsOptInPage() {
                   Message and data rates may apply. Message frequency varies (typically 2–8/month).
                   Reply <strong>STOP</strong> to cancel, <strong>HELP</strong> for help.
                   Consent is not required to use Parish Scribe. See our{" "}
-                  <span className="underline">Privacy Policy</span> and <span className="underline">Terms of Service</span>.
+                  <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">Privacy Policy</Link> and <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">Terms of Service</Link>.
                 </p>
               </div>
             </div>

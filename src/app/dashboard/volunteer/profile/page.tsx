@@ -5,7 +5,14 @@ import React, { useState } from "react";
 import { useUser, useFirestore, useDoc } from "@/firebase";
 import { useAuth } from "@/firebase";
 import { useMemoFirebase } from "@/firebase/hooks/use-memo-firebase";
-import { updateProfile } from "firebase/auth";
+import {
+  updateProfile,
+  EmailAuthProvider,
+  linkWithCredential,
+  updatePassword,
+  reauthenticateWithPopup,
+  GoogleAuthProvider,
+} from "firebase/auth";
 import { doc, updateDoc, serverTimestamp, arrayUnion } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -15,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Loader2, Upload, MessageSquare, ShieldCheck, Bell } from "lucide-react";
+import { Loader2, Upload, MessageSquare, ShieldCheck, Bell, Smartphone } from "lucide-react";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
@@ -451,8 +458,109 @@ export default function VolunteerProfilePage() {
           </CardFooter>
         </Card>
 
+        {/* ── Mobile App Access Card ───────────────────────────────────── */}
+        <MobilePasswordCard user={user} />
+
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mobile App Access — lets Google-only accounts set a password so they can
+// sign in to the Parish Scribe mobile app with email + password.
+// ---------------------------------------------------------------------------
+function MobilePasswordCard({ user }: { user: any }) {
+  const hasPasswordProvider = user?.providerData?.some(
+    (p: any) => p.providerId === "password",
+  );
+
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSetPassword = async () => {
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      if (hasPasswordProvider) {
+        // Already linked — just update the password.
+        // Requires recent sign-in; re-auth with Google first.
+        await reauthenticateWithPopup(user, new GoogleAuthProvider());
+        await updatePassword(user, newPassword);
+      } else {
+        // Link email/password provider to the existing Google account.
+        const credential = EmailAuthProvider.credential(user.email!, newPassword);
+        await linkWithCredential(user, credential);
+      }
+      toast.success("Password set! You can now sign in to the mobile app.");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (e: any) {
+      if (e.code === "auth/requires-recent-login") {
+        toast.error("Please sign out and sign back in, then try again.");
+      } else {
+        toast.error(e.message || "Failed to set password.");
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Smartphone className="h-5 w-5" />
+          Mobile App Access
+        </CardTitle>
+        <CardDescription>
+          {hasPasswordProvider
+            ? "Your account already has a password set for mobile app sign-in. You can update it here."
+            : "Set a password to sign in to the Parish Scribe mobile app with your email address."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="new-password">
+            {hasPasswordProvider ? "New Password" : "Create Password"}
+          </Label>
+          <Input
+            id="new-password"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="At least 8 characters"
+            autoComplete="new-password"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="confirm-password">Confirm Password</Label>
+          <Input
+            id="confirm-password"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Re-enter password"
+            autoComplete="new-password"
+          />
+        </div>
+      </CardContent>
+      <CardFooter>
+        <Button onClick={handleSetPassword} disabled={isSaving || !newPassword || !confirmPassword}>
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {hasPasswordProvider ? "Update Password" : "Set Password"}
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }
 

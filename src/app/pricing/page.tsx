@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, X, Feather, Zap } from "lucide-react";
+import { CheckCircle2, X, Zap } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -99,9 +100,8 @@ export default function PricingPage() {
       {/* Nav */}
       <header className="border-b">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-bold text-xl">
-            <Feather className="h-6 w-6 text-brand-accent" />
-            Parish Scribe
+          <Link href="/">
+            <Image src="/logo.png" alt="Parish Scribe" width={160} height={40} className="h-9 w-auto object-contain" />
           </Link>
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild><Link href="/sign-in">Sign in</Link></Button>
@@ -231,8 +231,7 @@ export default function PricingPage() {
 
       <footer className="border-t mt-20 py-8 text-center text-sm text-muted-foreground">
         <div className="flex items-center justify-center gap-2 mb-2">
-          <Feather className="h-4 w-4 text-brand-accent" />
-          <span className="font-semibold text-foreground">Parish Scribe</span>
+          <Image src="/logo.png" alt="Parish Scribe" width={120} height={30} className="h-7 w-auto object-contain" />
         </div>
         <p>© {new Date().getFullYear()} Joel Erdman dba ParishScribe. Built for faith communities.</p>
       </footer>

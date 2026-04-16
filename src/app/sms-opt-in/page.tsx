@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Feather, MessageSquare, ShieldCheck, CheckCircle2, ArrowRight } from "lucide-react";
+import { MessageSquare, ShieldCheck, CheckCircle2, ArrowRight } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -16,9 +17,8 @@ export default function SmsOptInPage() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b py-4 px-6">
-        <Link href="/" className="flex items-center gap-2 w-fit">
-          <Feather className="h-5 w-5 text-primary" />
-          <span className="font-semibold text-lg">Parish Scribe</span>
+        <Link href="/" className="w-fit">
+          <Image src="/logo.png" alt="Parish Scribe" width={140} height={36} className="h-8 w-auto object-contain" />
         </Link>
       </header>
 

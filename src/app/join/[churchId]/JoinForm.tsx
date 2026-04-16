@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { submitJoinRequest, sendClaimLink } from "./actions";
-import { CheckCircle2, Feather, Loader2, Mail, ChevronDown } from "lucide-react";
+import { CheckCircle2, Loader2, Mail, ChevronDown } from "lucide-react";
+import Image from "next/image";
 
 interface RoleTemplate {
   id: string;
@@ -120,9 +121,7 @@ export default function JoinForm({ churchId, churchName, logoUrl, primaryColor, 
         {logoUrl ? (
           <img src={logoUrl} alt={`${churchName} logo`} className="h-10 w-10 object-contain rounded" />
         ) : (
-          <div className="h-10 w-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${accent}18` }}>
-            <Feather className="h-5 w-5" style={{ color: accent }} />
-          </div>
+          <Image src="/icon.png" alt="Parish Scribe" width={40} height={40} className="h-10 w-10 object-contain rounded-lg" />
         )}
         <div>
           <p className="font-bold text-gray-900 leading-tight">{churchName}</p>

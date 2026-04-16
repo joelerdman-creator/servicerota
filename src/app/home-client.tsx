@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/firebase";
 import {
-  Users, Mail, Zap, Feather, CalendarDays, CheckCircle2,
+  Users, Mail, Zap, CalendarDays, CheckCircle2,
   Clock, ArrowRight, BarChart3, Bell, RefreshCw, MessageSquare,
   ChevronRight, Shield,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 // ---------------------------------------------------------------------------
 // Mini feature mockups
@@ -332,7 +333,7 @@ function AppMockup({ compact = false }: { compact?: boolean }) {
 
         {/* Fake nav */}
         <div className="flex items-center gap-4 px-5 py-3 border-b bg-primary">
-          <Feather className="h-4 w-4 text-orange-400 shrink-0" />
+          <Image src="/icon.png" alt="Parish Scribe" width={16} height={16} className="h-4 w-4 object-contain shrink-0 rounded-sm" />
           <span className="text-xs font-semibold text-white">Parish Scribe</span>
           <div className="flex gap-3 ml-2">
             {["Schedule", "Volunteers", "Events"].map((item, i) => (
@@ -439,8 +440,7 @@ export default function HomeClient() {
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur-sm">
         <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
           <Link href="/" className="flex items-center gap-2">
-            <Feather className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold">Parish Scribe</span>
+            <Image src="/logo.png" alt="Parish Scribe" width={160} height={40} className="h-9 w-auto object-contain" />
           </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
             <Link href="#features" className="hover:text-foreground transition-colors">
@@ -675,8 +675,7 @@ export default function HomeClient() {
         <div className="container px-4 md:px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Feather className="h-5 w-5 text-primary" />
-              <span className="font-semibold">Parish Scribe</span>
+              <Image src="/logo.png" alt="Parish Scribe" width={120} height={30} className="h-7 w-auto object-contain" />
             </div>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
               <Link href="#features" className="hover:text-foreground transition-colors">Features</Link>

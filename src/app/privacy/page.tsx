@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Feather } from "lucide-react";
+import Image from "next/image";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -14,9 +14,8 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b py-4 px-6">
-        <Link href="/" className="flex items-center gap-2 w-fit">
-          <Feather className="h-5 w-5 text-primary" />
-          <span className="font-semibold text-lg">Parish Scribe</span>
+        <Link href="/" className="w-fit">
+          <Image src="/logo.png" alt="Parish Scribe" width={140} height={36} className="h-8 w-auto object-contain" />
         </Link>
       </header>
 

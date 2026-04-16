@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Feather, LogOut, Repeat, Moon, Sun } from "lucide-react";
+import { LogOut, Repeat, Moon, Sun } from "lucide-react";
+import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -76,8 +77,8 @@ export default function VolunteerLayout({ children }: { children: React.ReactNod
             href="/dashboard/volunteer"
             className="flex items-center gap-2 font-bold text-xl hover:opacity-80 transition-opacity"
           >
-            <Feather className="h-6 w-6 text-brand-accent shrink-0" />
-            <span className="hidden sm:inline">Parish Scribe</span>
+            <Image src="/logo.png" alt="Parish Scribe" width={140} height={36} className="hidden sm:block h-8 w-auto object-contain rounded" />
+            <Image src="/icon.png" alt="Parish Scribe" width={32} height={32} className="sm:hidden h-8 w-8 object-contain rounded" />
           </Link>
 
           <div className="flex items-center gap-4">

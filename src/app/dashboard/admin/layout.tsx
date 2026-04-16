@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LogOut,
-  Feather,
   ShieldAlert,
   Menu,
   Repeat,
@@ -31,6 +30,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 import { useDoc, useFirestore, useUser, useAuth } from "@/firebase";
 import { useMemoFirebase } from "@/firebase/hooks/use-memo-firebase";
 import { signOut } from "firebase/auth";
@@ -165,8 +165,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-2">
               <Link href="/dashboard/admin" className="flex items-center gap-2 font-bold text-xl hover:opacity-80 transition-opacity whitespace-nowrap">
-                <Feather className="h-6 w-6 text-brand-accent shrink-0" />
-                <span className="hidden sm:inline">Parish Scribe</span>
+                <Image src="/logo.png" alt="Parish Scribe" width={140} height={36} className="hidden sm:block h-8 w-auto object-contain rounded" />
+                <Image src="/icon.png" alt="Parish Scribe" width={32} height={32} className="sm:hidden h-8 w-8 object-contain rounded" />
               </Link>
 
               <span className="hidden sm:inline text-nav-foreground/40 font-light mx-1 text-xl">/</span>
@@ -237,8 +237,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <SheetContent side="left" className="w-[300px] flex flex-col pt-12">
                 <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                 <div className="absolute top-4 left-4 flex items-center gap-2">
-                  <Feather className="h-6 w-6 text-brand-accent" />
-                  <span className="font-bold text-xl">Parish Scribe</span>
+                  <Image src="/logo.png" alt="Parish Scribe" width={140} height={36} className="h-8 w-auto object-contain" />
                 </div>
 
                 <div className="mt-4 mb-6 relative z-10">

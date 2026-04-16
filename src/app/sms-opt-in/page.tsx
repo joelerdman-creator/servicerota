@@ -116,7 +116,9 @@ export default function SmsOptInPage() {
                       assignment confirmations, service reminders, and substitution requests.
                     </p>
                   </div>
-                  <div className="h-6 w-11 rounded-full bg-primary shrink-0" />
+                  <div className="h-6 w-11 rounded-full bg-gray-200 border border-gray-300 shrink-0 flex items-center px-0.5">
+                    <div className="h-5 w-5 rounded-full bg-white shadow-sm" />
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground leading-snug">
                   Message and data rates may apply. Message frequency varies (typically 2–8/month).

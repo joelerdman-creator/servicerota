@@ -165,7 +165,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-2">
               <Link href="/dashboard/admin" className="flex items-center gap-2 font-bold text-xl hover:opacity-80 transition-opacity whitespace-nowrap">
-                <Image src="/logo.png" alt="Parish Scribe" width={140} height={36} className="hidden sm:block h-8 w-auto object-contain rounded" />
+                <Image src="/logo.svg" alt="Parish Scribe" width={140} height={36} className="hidden sm:block h-8 w-auto object-contain rounded" />
                 <Image src="/icon.png" alt="Parish Scribe" width={32} height={32} className="sm:hidden h-8 w-8 object-contain rounded" />
               </Link>
 
@@ -237,7 +237,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <SheetContent side="left" className="w-[300px] flex flex-col pt-12">
                 <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                 <div className="absolute top-4 left-4 flex items-center gap-2">
-                  <Image src="/logo.png" alt="Parish Scribe" width={140} height={36} className="h-8 w-auto object-contain" />
+                  <Image src="/logo.svg" alt="Parish Scribe" width={140} height={36} className="h-8 w-auto object-contain" />
                 </div>
 
                 <div className="mt-4 mb-6 relative z-10">

@@ -77,7 +77,7 @@ export default function VolunteerLayout({ children }: { children: React.ReactNod
             href="/dashboard/volunteer"
             className="flex items-center gap-2 font-bold text-xl hover:opacity-80 transition-opacity"
           >
-            <Image src="/logo.png" alt="Parish Scribe" width={140} height={36} className="hidden sm:block h-8 w-auto object-contain rounded" />
+            <Image src="/logo.svg" alt="Parish Scribe" width={140} height={36} className="hidden sm:block h-8 w-auto object-contain rounded" />
             <Image src="/icon.png" alt="Parish Scribe" width={32} height={32} className="sm:hidden h-8 w-8 object-contain rounded" />
           </Link>
 

@@ -440,7 +440,7 @@ export default function HomeClient() {
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur-sm">
         <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="Parish Scribe" width={160} height={40} className="h-9 w-auto object-contain" />
+            <Image src="/logo.svg" alt="Parish Scribe" width={160} height={40} className="h-9 w-auto object-contain" />
           </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
             <Link href="#features" className="hover:text-foreground transition-colors">
@@ -675,7 +675,7 @@ export default function HomeClient() {
         <div className="container px-4 md:px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Image src="/logo.png" alt="Parish Scribe" width={120} height={30} className="h-7 w-auto object-contain" />
+              <Image src="/logo.svg" alt="Parish Scribe" width={120} height={30} className="h-7 w-auto object-contain" />
             </div>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
               <Link href="#features" className="hover:text-foreground transition-colors">Features</Link>

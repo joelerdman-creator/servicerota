@@ -101,7 +101,7 @@ export default function PricingPage() {
       <header className="border-b">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/">
-            <Image src="/logo.png" alt="Parish Scribe" width={160} height={40} className="h-9 w-auto object-contain" />
+            <Image src="/logo.svg" alt="Parish Scribe" width={160} height={40} className="h-9 w-auto object-contain" />
           </Link>
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild><Link href="/sign-in">Sign in</Link></Button>
@@ -231,7 +231,7 @@ export default function PricingPage() {
 
       <footer className="border-t mt-20 py-8 text-center text-sm text-muted-foreground">
         <div className="flex items-center justify-center gap-2 mb-2">
-          <Image src="/logo.png" alt="Parish Scribe" width={120} height={30} className="h-7 w-auto object-contain" />
+          <Image src="/logo.svg" alt="Parish Scribe" width={120} height={30} className="h-7 w-auto object-contain" />
         </div>
         <p>© {new Date().getFullYear()} Joel Erdman dba ParishScribe. Built for faith communities.</p>
       </footer>

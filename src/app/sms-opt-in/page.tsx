@@ -18,7 +18,7 @@ export default function SmsOptInPage() {
       {/* Header */}
       <header className="border-b py-4 px-6">
         <Link href="/" className="w-fit">
-          <Image src="/logo.png" alt="Parish Scribe" width={140} height={36} className="h-8 w-auto object-contain" />
+          <Image src="/logo.svg" alt="Parish Scribe" width={140} height={36} className="h-8 w-auto object-contain" />
         </Link>
       </header>
 
